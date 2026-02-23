@@ -40,6 +40,42 @@
             text-align: center;
         }
 
+        .setup-panel {
+            max-width: 400px;
+            margin: 20px auto;
+            background: #e3f2fd;
+            border-radius: 10px;
+            padding: 20px;
+            border-left: 4px solid #2196f3;
+        }
+
+        .setup-panel h3 {
+            color: #0d47a1;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .setup-btn {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .setup-info {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            margin-top: 10px;
+            border: 1px solid #bbdefb;
+        }
+
         /* Dashboard Layout */
         .dashboard {
             max-width: 1400px;
@@ -48,7 +84,6 @@
             display: none;
         }
 
-        /* Header */
         .dashboard-header {
             background: linear-gradient(135deg, #ff4d4d, #cc0000);
             color: white;
@@ -94,7 +129,6 @@
             text-transform: uppercase;
         }
 
-        /* Navigation Tabs */
         .nav-tabs {
             display: flex;
             gap: 10px;
@@ -122,7 +156,6 @@
             color: white;
         }
 
-        /* Tab Content */
         .tab-content {
             display: none;
         }
@@ -131,7 +164,6 @@
             display: block;
         }
 
-        /* Stats Cards */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -166,7 +198,6 @@
             letter-spacing: 1px;
         }
 
-        /* Filter Bar */
         .filter-bar {
             background: white;
             padding: 20px;
@@ -219,7 +250,6 @@
             background: #f0f0f0;
         }
 
-        /* Emergencies Grid */
         .emergencies-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -357,7 +387,6 @@
             color: white;
         }
 
-        /* Map Container */
         .map-container {
             background: white;
             border-radius: 15px;
@@ -405,7 +434,6 @@
             color: #333;
         }
 
-        /* User Management */
         .users-header {
             display: flex;
             gap: 20px;
@@ -509,7 +537,6 @@
             overflow-y: auto;
         }
 
-        /* Code Management */
         .codes-header {
             display: flex;
             gap: 20px;
@@ -582,7 +609,6 @@
             cursor: pointer;
         }
 
-        /* Admin Management */
         .admins-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
@@ -638,7 +664,6 @@
             width: 100%;
         }
 
-        /* Modal */
         .modal {
             display: none;
             position: fixed;
@@ -660,7 +685,6 @@
             width: 90%;
         }
 
-        /* Buttons */
         .btn-primary {
             background: #ff4d4d;
             color: white;
@@ -697,7 +721,6 @@
             cursor: pointer;
         }
 
-        /* Message */
         .message {
             margin-top: 20px;
             padding: 15px;
@@ -709,7 +732,6 @@
         .error { background: #f8d7da; color: #721c24; }
         .info { background: #d1ecf1; color: #0c5460; }
 
-        /* Footer */
         .footer {
             text-align: center;
             padding: 20px;
@@ -738,7 +760,6 @@
             }
         }
 
-        /* Animations */
         @keyframes slideIn {
             from {
                 opacity: 0;
@@ -771,6 +792,15 @@
     <!-- Admin Login -->
     <div id="loginContainer" class="login-container">
         <h2>DIMAX Admin Login</h2>
+        
+        <!-- Setup Panel (will appear if first time or if admin document missing) -->
+        <div id="setupPanel" class="setup-panel" style="display: none;">
+            <h3>🔧 First Time Setup</h3>
+            <p style="font-size: 13px; margin-bottom: 10px;">Your admin account exists but needs to be configured in Firestore.</p>
+            <button id="setupAdminBtn" class="setup-btn" onclick="setupAdminAccount()">Setup My Admin Account</button>
+            <div id="setupStatus" class="setup-info"></div>
+        </div>
+
         <form id="adminLoginForm">
             <div class="form-group" style="margin-bottom: 20px;">
                 <label>Email</label>
@@ -1012,40 +1042,99 @@
         auth.onAuthStateChanged(async (user) => {
             if (user) {
                 // Check if user is admin/operator
-                const adminDoc = await db.collection(ADMINS_COLLECTION).doc(user.uid).get();
-                if (adminDoc.exists) {
-                    currentUser = user;
-                    currentUserRole = adminDoc.data().role;
+                try {
+                    const adminDoc = await db.collection(ADMINS_COLLECTION).doc(user.uid).get();
                     
-                    // Show dashboard
-                    document.getElementById('loginContainer').style.display = 'none';
-                    document.getElementById('dashboard').style.display = 'block';
-                    document.getElementById('adminName').textContent = adminDoc.data().firstName + ' ' + adminDoc.data().lastName;
-                    document.getElementById('adminRole').textContent = currentUserRole === 'admin' ? 'Super Admin' : 'Operator';
-                    
-                    // Initialize map
-                    initMap();
-                    
-                    // Load all data
-                    loadEmergencies();
-                    loadStats();
-                    loadUsers();
-                    loadCodes();
-                    loadAdmins();
-                    loadGroups();
-                    loadFilters();
-                    
-                    // Setup realtime listener
-                    setupRealtimeListener();
-                } else {
-                    await auth.signOut();
-                    showLoginMessage('Access denied. Admin only.', 'error');
+                    if (adminDoc.exists) {
+                        // Admin exists in Firestore - proceed to dashboard
+                        currentUser = user;
+                        currentUserRole = adminDoc.data().role;
+                        
+                        // Show dashboard
+                        document.getElementById('loginContainer').style.display = 'none';
+                        document.getElementById('dashboard').style.display = 'block';
+                        document.getElementById('adminName').textContent = adminDoc.data().firstName + ' ' + adminDoc.data().lastName;
+                        document.getElementById('adminRole').textContent = currentUserRole === 'admin' ? 'Super Admin' : 'Operator';
+                        
+                        // Initialize map
+                        initMap();
+                        
+                        // Load all data
+                        loadEmergencies();
+                        loadStats();
+                        loadUsers();
+                        loadCodes();
+                        loadAdmins();
+                        loadGroups();
+                        loadFilters();
+                        
+                        // Setup realtime listener
+                        setupRealtimeListener();
+                    } else {
+                        // Admin authenticated but not in Firestore - show setup panel
+                        document.getElementById('setupPanel').style.display = 'block';
+                        document.getElementById('adminLoginMessage').innerHTML = 'Your admin account needs setup. Click the button below to complete setup.';
+                        document.getElementById('adminLoginMessage').className = 'message info';
+                        
+                        // Store user for setup
+                        currentUser = user;
+                    }
+                } catch (error) {
+                    console.error('Error checking admin status:', error);
+                    showLoginMessage('Error checking admin status: ' + error.message, 'error');
                 }
             } else {
                 document.getElementById('loginContainer').style.display = 'block';
                 document.getElementById('dashboard').style.display = 'none';
+                document.getElementById('setupPanel').style.display = 'none';
             }
         });
+
+        // Setup admin account function
+        window.setupAdminAccount = async function() {
+            const setupBtn = document.getElementById('setupAdminBtn');
+            const setupStatus = document.getElementById('setupStatus');
+            
+            setupBtn.disabled = true;
+            setupStatus.innerHTML = 'Setting up your admin account...';
+            
+            try {
+                if (!currentUser) {
+                    throw new Error('No user logged in');
+                }
+                
+                // Get user email
+                const email = currentUser.email;
+                
+                // Split email for first name
+                const firstName = email.split('@')[0] || 'Admin';
+                
+                // Create admin document in Firestore
+                await db.collection(ADMINS_COLLECTION).doc(currentUser.uid).set({
+                    userId: currentUser.uid,
+                    firstName: firstName,
+                    lastName: 'User',
+                    email: email,
+                    role: 'admin', // Give full admin rights
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                setupStatus.innerHTML = '✅ Admin account setup complete! Refreshing...';
+                setupStatus.className = 'setup-info success';
+                
+                // Reload to show dashboard
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+                
+            } catch (error) {
+                console.error('Setup error:', error);
+                setupStatus.innerHTML = '❌ Error: ' + error.message;
+                setupStatus.className = 'setup-info error';
+                setupBtn.disabled = false;
+            }
+        };
 
         // Login handler
         document.getElementById('adminLoginForm').addEventListener('submit', async (e) => {
@@ -1069,10 +1158,14 @@
 
         // Initialize Map
         function initMap() {
-            map = L.map('emergencyMap').setView([14.5995, 120.9842], 12);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors'
-            }).addTo(map);
+            if (!map) {
+                map = L.map('emergencyMap').setView([14.5995, 120.9842], 12);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(map);
+            } else {
+                map.invalidateSize();
+            }
         }
 
         // Switch tabs
@@ -1086,7 +1179,9 @@
             if (tab === 'emergencies') {
                 tabs[0].classList.add('active');
                 document.getElementById('emergenciesTab').classList.add('active');
-                setTimeout(() => map.invalidateSize(), 100);
+                setTimeout(() => {
+                    if (map) map.invalidateSize();
+                }, 100);
             } else if (tab === 'users') {
                 tabs[1].classList.add('active');
                 document.getElementById('usersTab').classList.add('active');
@@ -1131,8 +1226,6 @@
 
         // Load emergencies
         function loadEmergencies() {
-            let query = db.collection(EMERGENCIES_COLLECTION).orderBy('timestamp', 'desc');
-            
             db.collection(EMERGENCIES_COLLECTION).orderBy('timestamp', 'desc').onSnapshot((snapshot) => {
                 const emergenciesList = document.getElementById('emergenciesList');
                 emergenciesList.innerHTML = '';
@@ -1799,7 +1892,6 @@
 
         // Export users
         window.exportUsers = function() {
-            // Implementation for exporting users to CSV
             alert('Export feature coming soon');
         };
 
