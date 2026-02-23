@@ -674,7 +674,7 @@
             color: white;
         }
 
-        /* Codes Tab Styles - Fixed readability */
+        /* Codes Tab Styles */
         .codes-header {
             display: flex;
             gap: 20px;
@@ -796,7 +796,7 @@
             transform: translateY(-2px);
         }
 
-        /* Admin Management Styles - Fixed readability */
+        /* Admin Management Styles */
         .admins-header {
             display: flex;
             gap: 20px;
@@ -1136,7 +1136,6 @@
             animation: pulse 2s infinite;
         }
 
-        /* Copy notification */
         .copy-notification {
             position: fixed;
             bottom: 20px;
@@ -1325,7 +1324,7 @@
             </div>
         </div>
 
-        <!-- Codes Tab - Fixed with white background -->
+        <!-- Codes Tab -->
         <div id="codesTab" class="tab-content">
             <div class="codes-header">
                 <button class="btn-primary" onclick="showGenerateCodeModal()">+ Generate New Code</button>
@@ -1339,7 +1338,7 @@
             </div>
         </div>
 
-        <!-- Admin Management Tab - Fixed with white background and delete functionality -->
+        <!-- Admin Management Tab -->
         <div id="adminsTab" class="tab-content">
             <div class="admins-header">
                 <button class="btn-primary" onclick="showAddAdminModal()">+ Add Admin/Operator</button>
@@ -1527,24 +1526,6 @@
         </div>
     </div>
 
-    <!-- Reset Password Modal -->
-    <div id="resetPasswordModal" class="modal">
-        <div class="modal-content">
-            <h3>Reset Admin Password</h3>
-            <input type="hidden" id="resetAdminId">
-            <input type="hidden" id="resetAdminEmail">
-            <p id="resetAdminDisplay" style="margin-bottom: 20px;"></p>
-            <div class="form-group">
-                <label>New Password</label>
-                <input type="password" id="newPassword" placeholder="Enter new password">
-            </div>
-            <div class="modal-actions">
-                <button class="btn-primary" onclick="resetAdminPassword()">Reset Password</button>
-                <button class="btn-secondary" onclick="closeModal('resetPasswordModal')">Cancel</button>
-            </div>
-        </div>
-    </div>
-
     <!-- User Detail Modal -->
     <div id="userDetailModal" class="user-detail-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 2000;">
         <div class="user-detail-content" style="background: white; border-radius: 20px; padding: 30px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;">
@@ -1589,6 +1570,7 @@
         let selectedGroupId = null;
         let audio = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
         audio.loop = true;
+        let originalAdminCredentials = null; // Store original admin credentials when creating new admins
 
         // Emergency function to create admin document
         window.emergencyCreateAdmin = async function() {
@@ -1607,7 +1589,7 @@
                     }
                 }
                 
-                // Create admin document with explicit permissions
+                // Create admin document
                 const adminData = {
                     userId: currentUser.uid,
                     firstName: currentUser.email.split('@')[0],
@@ -2647,8 +2629,6 @@
                 // Delete from Firestore
                 await db.collection(ADMINS_COLLECTION).doc(adminId).delete();
                 
-                // Note: We can't delete from Auth without Admin SDK
-                // So we'll just remove from Firestore and warn the user
                 alert(`✅ Admin removed from Firestore.\n\nNote: The user still exists in Authentication. To completely remove access, delete them from Firebase Console > Authentication.`);
                 
                 // Refresh the list
@@ -2680,7 +2660,7 @@
             document.getElementById('addAdminModal').style.display = 'flex';
         };
 
-        // Create admin
+        // FIXED: Create admin without auto-login
         window.createAdmin = async function() {
             const email = document.getElementById('newAdminEmail').value;
             const password = document.getElementById('newAdminPassword').value;
@@ -2691,29 +2671,72 @@
                 return;
             }
             
+            // Store current admin credentials before creating new admin
+            const currentAdminEmail = currentUser?.email;
+            const currentAdminPassword = prompt("Please enter your current password to verify admin creation:", "");
+            
+            if (!currentAdminPassword) {
+                alert('Password verification required');
+                return;
+            }
+            
             try {
-                // Create in Firebase Auth
-                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-                const user = userCredential.user;
+                // Create in Firebase Auth using a separate auth instance? 
+                // Unfortunately Firebase doesn't support creating users without signing in
+                // So we'll create and then sign back in as the original admin
                 
-                // Create in Firestore
-                await db.collection(ADMINS_COLLECTION).doc(user.uid).set({
-                    userId: user.uid,
+                // Create the new admin (this will temporarily change the current user)
+                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                const newUser = userCredential.user;
+                
+                // Create in Firestore for the new user
+                await db.collection(ADMINS_COLLECTION).doc(newUser.uid).set({
+                    userId: newUser.uid,
                     firstName: email.split('@')[0],
                     lastName: '',
                     email: email,
                     role: role,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    createdBy: currentUser?.uid
+                    createdBy: currentUser?.uid,
+                    status: 'active'
                 });
                 
+                // Sign out the new admin
+                await auth.signOut();
+                
+                // Sign back in as the original admin
+                await auth.signInWithEmailAndPassword(currentAdminEmail, currentAdminPassword);
+                
+                // Close modal and show success
                 closeModal('addAdminModal');
                 document.getElementById('newAdminEmail').value = '';
                 document.getElementById('newAdminPassword').value = '';
+                
+                // Refresh admin list
                 loadAdmins();
-                alert('Admin/Operator created successfully');
+                
+                alert(`✅ Admin created successfully!\n\nEmail: ${email}\nRole: ${role}\n\nThey can now log in with their credentials.`);
+                
             } catch (error) {
-                alert('Error creating admin: ' + error.message);
+                console.error('Error creating admin:', error);
+                
+                if (error.code === 'auth/email-already-in-use') {
+                    alert('This email is already in use. Please use a different email.');
+                } else if (error.code === 'auth/weak-password') {
+                    alert('Password is too weak. Please use at least 6 characters.');
+                } else {
+                    alert('Error creating admin: ' + error.message);
+                }
+                
+                // Try to sign back in as original admin if we got switched
+                try {
+                    if (currentAdminEmail && currentAdminPassword) {
+                        await auth.signInWithEmailAndPassword(currentAdminEmail, currentAdminPassword);
+                    }
+                } catch (signInError) {
+                    console.error('Error signing back in:', signInError);
+                    showLoginMessage('Error signing back in. Please log in manually.', 'error');
+                }
             }
         };
 
