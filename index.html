@@ -330,27 +330,24 @@
 
         .sos-text {
             font-size: 52px;
-            margin-bottom: 5px;
+            margin-bottom: 2px;
             font-weight: 900;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-            transition: all 0.2s ease;
-        }
-
-        .sos-button.active .sos-text {
-            font-size: 46px;
+            line-height: 1;
         }
 
         .sos-engaged {
             font-size: 18px;
             font-weight: 700;
             letter-spacing: 1px;
-            margin-bottom: 2px;
+            margin: 2px 0;
         }
 
         .sos-press-to-stop {
             font-size: 14px;
             font-weight: 500;
             opacity: 0.9;
+            margin-top: 2px;
         }
 
         .sos-instruction {
@@ -358,6 +355,7 @@
             font-weight: 500;
             text-align: center;
             padding: 0 10px;
+            line-height: 1.4;
         }
 
         .status-message {
@@ -419,6 +417,11 @@
             font-weight: 500;
         }
 
+        .history-item.user-disengaged {
+            border-left-color: #ffc107;
+            background: #fff8e7;
+        }
+
         .history-item.completed {
             border-left-color: #28a745;
             background: #f0f0f0;
@@ -446,9 +449,24 @@
             color: white;
         }
 
+        .status-user-disengaged {
+            background: #ffc107;
+            color: #333;
+        }
+
         .status-completed {
             background: #28a745;
             color: white;
+        }
+
+        .permission-note {
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+            margin-top: 10px;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 8px;
         }
 
         .hidden {
@@ -548,6 +566,11 @@
                 
                 <div id="sosStatus" class="status-message"></div>
                 
+                <!-- Location Permission Note -->
+                <div id="permissionNote" class="permission-note">
+                    📍 I-share ang location para sa mas mabilis na rescue
+                </div>
+                
                 <div id="emergencyHistory" class="emergency-history">
                     <h3>📋 Kasaysayan ng Emergency</h3>
                     <div id="historyList"></div>
@@ -620,14 +643,22 @@
                     sosButton.classList.add('active');
                     
                     // Update button text
-                    const sosInstruction = document.querySelector('.sos-instruction');
-                    sosInstruction.innerHTML = '<span class="sos-engaged">ENGAGED</span><br><span class="sos-press-to-stop">PRESS TO STOP</span>';
+                    updateButtonText(true);
                     
                     document.getElementById('sosStatus').innerHTML = '✅ Emergency active';
                     document.getElementById('sosStatus').className = 'status-message success';
                 }
             } catch (error) {
                 console.error('Error checking active emergency:', error);
+            }
+        }
+
+        function updateButtonText(isActive) {
+            const sosInstruction = document.querySelector('.sos-instruction');
+            if (isActive) {
+                sosInstruction.innerHTML = '<span class="sos-engaged">ENGAGED</span><br><span class="sos-press-to-stop">PRESS TO STOP</span>';
+            } else {
+                sosInstruction.innerHTML = 'Pindutin kung may emergency';
             }
         }
 
@@ -725,8 +756,8 @@
             }
         });
 
-        // Get location - THIS triggers browser popup
-        function getLocation() {
+        // Get location - THIS triggers browser popup every time
+        function requestLocation() {
             return new Promise((resolve, reject) => {
                 if (!navigator.geolocation) {
                     reject(new Error('Geolocation not supported'));
@@ -735,6 +766,7 @@
                 
                 locationPermissionAsked = true;
                 
+                // This will trigger the browser's permission popup
                 navigator.geolocation.getCurrentPosition(resolve, reject, {
                     enableHighAccuracy: true,
                     timeout: 30000,
@@ -803,14 +835,27 @@
                     
                     if (data.status === 'active') {
                         div.classList.add('active');
+                    } else if (data.status === 'user_disengaged') {
+                        div.classList.add('user-disengaged');
                     } else if (data.status === 'completed') {
                         div.classList.add('completed');
                     }
                     
                     if (doc.id === currentEmergencyId) div.classList.add('active');
                     
-                    const statusText = data.status === 'active' ? 'Active' : 'Completed';
-                    const statusClass = data.status === 'active' ? 'status-active' : 'status-completed';
+                    let statusText = '';
+                    let statusClass = '';
+                    
+                    if (data.status === 'active') {
+                        statusText = 'Active';
+                        statusClass = 'status-active';
+                    } else if (data.status === 'user_disengaged') {
+                        statusText = 'User Disengaged';
+                        statusClass = 'status-user-disengaged';
+                    } else if (data.status === 'completed') {
+                        statusText = 'Completed';
+                        statusClass = 'status-completed';
+                    }
                     
                     div.innerHTML = `
                         <strong>🚨 Emergency</strong>
@@ -828,17 +873,19 @@
         // SOS Button
         const sosButton = document.getElementById('sosButton');
         const statusDiv = document.getElementById('sosStatus');
+        const permissionNote = document.getElementById('permissionNote');
 
         sosButton.addEventListener('click', async () => {
             if (isSOSActive) {
-                // Just deactivate locally and update status on server
+                // User disengaged - update status but keep in database
                 stopTracking();
                 
                 if (currentEmergencyId) {
                     try {
                         await db.collection(EMERGENCIES_COLLECTION).doc(currentEmergencyId).update({
-                            status: 'completed',
-                            endedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            status: 'user_disengaged',
+                            disengagedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            disengagedBy: 'user'
                         });
                         
                         isSOSActive = false;
@@ -846,15 +893,14 @@
                         sosButton.classList.remove('active');
                         
                         // Reset button text
-                        const sosInstruction = document.querySelector('.sos-instruction');
-                        sosInstruction.innerHTML = 'Pindutin kung may emergency';
+                        updateButtonText(false);
                         
-                        statusDiv.innerHTML = '✅ Emergency completed';
-                        statusDiv.className = 'status-message success';
+                        statusDiv.innerHTML = '✅ Emergency disengaged';
+                        statusDiv.className = 'status-message info';
                         loadHistory();
                         
                     } catch (error) {
-                        console.error('Deactivate error:', error);
+                        console.error('Disengage error:', error);
                         statusDiv.innerHTML = '❌ Failed to update status';
                         statusDiv.className = 'status-message error';
                     }
@@ -893,15 +939,17 @@
                     isSOSActive = true;
                     sosButton.classList.add('active');
                     
-                    // Update button text with ENGAGED above PRESS TO STOP
-                    const sosInstruction = document.querySelector('.sos-instruction');
-                    sosInstruction.innerHTML = '<span class="sos-engaged">ENGAGED</span><br><span class="sos-press-to-stop">PRESS TO STOP</span>';
+                    // Update button text
+                    updateButtonText(true);
                     
-                    statusDiv.innerHTML = '✅ SOS sent - Getting location...';
+                    statusDiv.innerHTML = '✅ SOS sent - Binabasa ang lokasyon...';
 
-                    // Try to get location - THIS triggers browser popup
+                    // Try to get location - THIS triggers browser popup every time
                     try {
-                        const position = await getLocation();
+                        // This will always trigger the browser's permission popup
+                        permissionNote.innerHTML = '📍 Hinihingi ang permission para sa location...';
+                        
+                        const position = await requestLocation();
                         
                         // Update with location
                         await db.collection(EMERGENCIES_COLLECTION).doc(currentEmergencyId).update({
@@ -913,12 +961,27 @@
                         });
                         
                         statusDiv.innerHTML = '✅ SOS active - Location shared';
+                        permissionNote.innerHTML = '📍 Location shared - Salamat!';
                         
                         // Start tracking
                         startTracking(currentEmergencyId);
                         
                     } catch (locError) {
                         console.log('Location not available:', locError.message);
+                        
+                        if (locError.code === 1) {
+                            // Permission denied
+                            permissionNote.innerHTML = '📍 Location denied - SOS sent without location';
+                        } else if (locError.code === 2) {
+                            // Position unavailable
+                            permissionNote.innerHTML = '📍 Location unavailable - SOS sent without location';
+                        } else if (locError.code === 3) {
+                            // Timeout
+                            permissionNote.innerHTML = '📍 Location timeout - SOS sent without location';
+                        } else {
+                            permissionNote.innerHTML = '📍 Location not shared - SOS still active';
+                        }
+                        
                         // SOS still active even without location
                         statusDiv.innerHTML = '✅ SOS active - No location';
                     }
@@ -932,11 +995,23 @@
                     sosButton.classList.remove('active');
                     
                     // Reset button text
-                    const sosInstruction = document.querySelector('.sos-instruction');
-                    sosInstruction.innerHTML = 'Pindutin kung may emergency';
+                    updateButtonText(false);
                 }
             }
         });
+
+        // Check location permission on page load
+        if (navigator.permissions) {
+            navigator.permissions.query({ name: 'geolocation' }).then(result => {
+                if (result.state === 'granted') {
+                    permissionNote.innerHTML = '📍 Location access granted';
+                } else if (result.state === 'prompt') {
+                    permissionNote.innerHTML = '📍 Ibahagi ang location para sa rescue';
+                } else if (result.state === 'denied') {
+                    permissionNote.innerHTML = '📍 Location blocked - Enable sa settings';
+                }
+            });
+        }
     </script>
 </body>
 </html>
