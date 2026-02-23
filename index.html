@@ -129,6 +129,7 @@
             flex: 1;
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
+            max-height: 60vh;
         }
 
         /* Footer */
@@ -152,6 +153,8 @@
             margin-bottom: 22px;
             border-bottom: 2px solid #e0e0e0;
             flex-shrink: 0;
+            background: white;
+            padding-top: 10px;
         }
 
         .tab {
@@ -228,6 +231,7 @@
             text-transform: uppercase;
             letter-spacing: 1px;
             -webkit-appearance: none;
+            margin-top: 10px;
         }
 
         .btn-primary:active {
@@ -455,83 +459,35 @@
             font-size: 12px;
         }
 
-        /* Confirmation Modal */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            justify-content: center;
-            align-items: center;
-            z-index: 2000;
-            backdrop-filter: blur(5px);
-        }
-
-        .modal-content {
-            background: white;
-            padding: 30px;
-            border-radius: 24px;
-            max-width: 300px;
-            text-align: center;
-            animation: modalSlide 0.3s ease;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-        }
-
-        @keyframes modalSlide {
-            from {
-                transform: translateY(-50px);
-                opacity: 0;
-            }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
-        }
-
-        .modal-content h3 {
-            color: #ff4d4d;
-            margin-bottom: 15px;
-            font-size: 24px;
-        }
-
-        .modal-content p {
-            color: #666;
-            margin-bottom: 25px;
-            font-size: 16px;
-        }
-
-        .modal-buttons {
+        /* Location status indicator */
+        .location-status {
             display: flex;
-            gap: 12px;
+            align-items: center;
             justify-content: center;
+            gap: 8px;
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            font-size: 13px;
         }
 
-        .modal-btn {
-            flex: 1;
-            padding: 14px;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 16px;
-            transition: transform 0.2s ease;
+        .location-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #6c757d;
         }
 
-        .modal-btn:active {
-            transform: scale(0.96);
+        .location-dot.active {
+            background: #28a745;
+            animation: blink 1s infinite;
         }
 
-        .modal-btn.yes {
-            background: #ff4d4d;
-            color: white;
-        }
-
-        .modal-btn.no {
-            background: #e0e0e0;
-            color: #333;
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0.4; }
+            100% { opacity: 1; }
         }
 
         .hidden {
@@ -644,6 +600,12 @@
                     <div class="user-group" id="groupBadge"></div>
                 </div>
                 
+                <!-- Location Status -->
+                <div id="locationStatus" class="location-status hidden">
+                    <span class="location-dot" id="locationDot"></span>
+                    <span id="locationText">Waiting for location...</span>
+                </div>
+                
                 <div class="sos-button-container">
                     <button id="sosButton" class="sos-button">
                         <span class="sos-text">SOS</span>
@@ -657,18 +619,6 @@
                     <h3>📋 Kasaysayan ng Emergency</h3>
                     <div id="historyList"></div>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Confirmation Modal -->
-    <div id="confirmModal" class="modal">
-        <div class="modal-content">
-            <h3>⚠️ DIMAX ALERT</h3>
-            <p>Sigurado ka bang may emergency?</p>
-            <div class="modal-buttons">
-                <button id="confirmYes" class="modal-btn yes">Oo</button>
-                <button id="confirmNo" class="modal-btn no">Hindi</button>
             </div>
         </div>
     </div>
@@ -740,6 +690,28 @@
         function showLandingPage() {
             document.getElementById('landingPage').style.display = 'block';
             document.getElementById('sosPage').classList.remove('active');
+        }
+
+        // Update location status
+        function updateLocationStatus(active, message) {
+            const statusDiv = document.getElementById('locationStatus');
+            const dot = document.getElementById('locationDot');
+            const text = document.getElementById('locationText');
+            
+            statusDiv.classList.remove('hidden');
+            
+            if (active) {
+                dot.className = 'location-dot active';
+                text.textContent = message || 'Sharing location';
+            } else {
+                dot.className = 'location-dot';
+                text.textContent = message || 'Location not available';
+            }
+        }
+
+        // Hide location status
+        function hideLocationStatus() {
+            document.getElementById('locationStatus').classList.add('hidden');
         }
 
         // Switch between login and register tabs
@@ -876,7 +848,7 @@
             }
         });
 
-        // Get current position (triggers browser permission popup)
+        // Get current position - this triggers the browser's native permission popup
         function getCurrentPosition() {
             return new Promise((resolve, reject) => {
                 if (!navigator.geolocation) {
@@ -884,7 +856,7 @@
                     return;
                 }
                 
-                // This triggers the browser's native permission popup
+                // This triggers the browser's native "Allow" popup
                 navigator.geolocation.getCurrentPosition(resolve, reject, {
                     enableHighAccuracy: true,
                     timeout: 30000,
@@ -911,7 +883,7 @@
                                 location: lastLocation,
                                 lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
                             });
-                            console.log('Location updated:', lastLocation);
+                            updateLocationStatus(true, `📍 Tracking: ${lastLocation.lat.toFixed(4)}, ${lastLocation.lng.toFixed(4)}`);
                         } catch (error) {
                             console.error('Error updating location:', error);
                         }
@@ -919,6 +891,7 @@
                 },
                 (error) => {
                     console.error('Watch position error:', error);
+                    updateLocationStatus(false, 'Location tracking failed');
                 },
                 {
                     enableHighAccuracy: true,
@@ -983,28 +956,14 @@
             }
         }
 
-        // Handle SOS Button with confirmation modal
+        // Handle SOS Button - Single press to toggle
         const sosButton = document.getElementById('sosButton');
-        const modal = document.getElementById('confirmModal');
-        const confirmYes = document.getElementById('confirmYes');
-        const confirmNo = document.getElementById('confirmNo');
 
-        sosButton.addEventListener('click', () => {
-            modal.style.display = 'flex';
-        });
-
-        confirmNo.addEventListener('click', () => {
-            modal.style.display = 'none';
-        });
-
-        confirmYes.addEventListener('click', async () => {
-            modal.style.display = 'none';
-            await activateSOS();
-        });
-
-        window.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.style.display = 'none';
+        sosButton.addEventListener('click', async () => {
+            if (isSOSActive) {
+                await deactivateSOS();
+            } else {
+                await activateSOS();
             }
         });
 
@@ -1052,7 +1011,7 @@
                 statusDiv.innerHTML = '✅ SOS Activated - Binabasa ang lokasyon...';
                 statusDiv.className = 'status-message success';
                 
-                // Try to get location - this triggers the browser's permission popup
+                // Try to get location - this triggers the browser's native permission popup
                 try {
                     const position = await getCurrentPosition();
                     lastLocation = {
@@ -1068,6 +1027,7 @@
                     });
                     
                     statusDiv.innerHTML = '✅ SOS Activated - Ibinahagi ang lokasyon';
+                    updateLocationStatus(true, `📍 Tracking: ${lastLocation.lat.toFixed(4)}, ${lastLocation.lng.toFixed(4)}`);
                     
                     // Start continuous tracking
                     startWatchingPosition(currentEmergencyId);
@@ -1076,14 +1036,18 @@
                     // Location permission denied or error - SOS still active without location
                     console.warn('Location error:', locationError);
                     
-                    if (locationError.code === 1) {
+                    if (locationError.code === 1) { // PERMISSION_DENIED
                         statusDiv.innerHTML = '✅ SOS Activated - Hindi pinayagan ang lokasyon';
-                    } else if (locationError.code === 2) {
+                        updateLocationStatus(false, '📍 Location permission denied');
+                    } else if (locationError.code === 2) { // POSITION_UNAVAILABLE
                         statusDiv.innerHTML = '✅ SOS Activated - Hindi makuha ang lokasyon';
-                    } else if (locationError.code === 3) {
+                        updateLocationStatus(false, '📍 Location unavailable');
+                    } else if (locationError.code === 3) { // TIMEOUT
                         statusDiv.innerHTML = '✅ SOS Activated - Timeout sa lokasyon';
+                        updateLocationStatus(false, '📍 Location timeout');
                     } else {
                         statusDiv.innerHTML = '✅ SOS Activated - Walang lokasyon';
+                        updateLocationStatus(false, '📍 Location not available');
                     }
                 }
                 
@@ -1096,17 +1060,7 @@
                 statusDiv.className = 'status-message error';
                 sosButton.classList.remove('active');
                 document.querySelector('.sos-instruction').textContent = 'Pindutin kung may emergency';
-                
-                // Clean up if emergency was created
-                if (currentEmergencyId) {
-                    try {
-                        await db.collection(EMERGENCIES_COLLECTION).doc(currentEmergencyId).delete();
-                    } catch (e) {
-                        console.error('Cleanup error:', e);
-                    }
-                    currentEmergencyId = null;
-                    isSOSActive = false;
-                }
+                hideLocationStatus();
             }
         }
 
@@ -1136,6 +1090,9 @@
                 statusDiv.innerHTML = '✅ SOS Deactivated';
                 statusDiv.className = 'status-message info';
                 
+                // Hide location status
+                hideLocationStatus();
+                
                 // Refresh history
                 const user = auth.currentUser;
                 if (user) {
@@ -1146,15 +1103,6 @@
                 console.error('Deactivate SOS error:', error);
             }
         }
-
-        // Handle SOS button for deactivation when already active
-        sosButton.addEventListener('click', () => {
-            if (isSOSActive) {
-                deactivateSOS();
-            } else {
-                modal.style.display = 'flex';
-            }
-        });
 
         // Prevent zoom on input focus for iOS
         document.addEventListener('touchstart', (e) => {
@@ -1168,6 +1116,15 @@
             setTimeout(() => {
                 document.querySelector('.content-scroll').scrollTop = document.querySelector('.content-scroll').scrollHeight;
             }, 300);
+        });
+
+        // Auto-scroll when input is focused
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('focus', () => {
+                setTimeout(() => {
+                    input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 300);
+            });
         });
     </script>
 </body>
