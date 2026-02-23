@@ -9,6 +9,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
     <style>
+        /* Keep all existing styles from previous version */
         * {
             margin: 0;
             padding: 0;
@@ -116,7 +117,23 @@
             transform: translateY(-2px);
         }
 
-        .btn-create-admin {
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(220,53,69,0.3);
+        }
+
+        .btn-success {
             background: #28a745;
             color: white;
             border: none;
@@ -129,7 +146,7 @@
             margin-top: 10px;
         }
 
-        .btn-create-admin:hover {
+        .btn-success:hover {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(40,167,69,0.3);
         }
@@ -534,6 +551,34 @@
             margin-top: 10px;
         }
 
+        .user-list {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+
+        .user-item {
+            padding: 10px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .user-item:hover {
+            background: #f5f5f5;
+        }
+
+        .make-admin-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
         @media (max-width: 768px) {
             .dashboard-header {
                 flex-direction: column;
@@ -614,7 +659,7 @@
                 <p><strong>Email:</strong> admin@dimax.com</p>
                 <p><strong>Password:</strong> admin123</p>
             </div>
-            <p><small>You can change these after first login.</small></p>
+            <p><small>Click "Fix Admin Access" below if you can't login.</small></p>
         </div>
 
         <!-- Setup Instructions -->
@@ -642,8 +687,11 @@
             <button type="submit" class="btn-primary" style="width: 100%;">Login to Dashboard</button>
         </form>
         
-        <!-- Create Admin Button (shown if no admin exists) -->
-        <button id="createAdminBtn" class="btn-create-admin" style="display: none;">Create Default Admin Account</button>
+        <!-- Fix Admin Access Button -->
+        <button id="fixAdminBtn" class="btn-success" style="display: none;">🔧 Fix Admin Access</button>
+        
+        <!-- Force Create Admin Button -->
+        <button id="forceCreateAdminBtn" class="btn-danger" style="display: none;">⚠️ Force Create New Admin</button>
         
         <div id="adminLoginMessage" class="message" style="margin-top: 20px;"></div>
     </div>
@@ -685,6 +733,7 @@
         <div class="tab-container">
             <div class="tab active" onclick="switchAdminTab('emergencies')">🚨 Live Emergencies</div>
             <div class="tab" onclick="switchAdminTab('groups')">👥 Groups & Codes</div>
+            <div class="tab" onclick="switchAdminTab('users')">👤 Manage Users</div>
             <div class="tab" onclick="switchAdminTab('reports')">📊 Reports</div>
         </div>
 
@@ -713,6 +762,16 @@
                 <button class="btn-primary" onclick="showGenerateCodeModal()" style="margin-bottom: 20px;">+ Generate New Code</button>
                 <div id="codesList" class="code-list">
                     <!-- Codes will appear here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Users Tab -->
+        <div id="usersTab" class="tab-content">
+            <div class="section">
+                <h2>👤 Manage Users</h2>
+                <div class="user-list" id="userList">
+                    <!-- Users will appear here -->
                 </div>
             </div>
         </div>
@@ -801,8 +860,8 @@
             
             console.log('Firebase initialized successfully');
             
-            // Check auth and create admin if needed
-            checkAuthAndCreateAdmin();
+            // Check auth status
+            checkAuthStatus();
         } catch (error) {
             console.error('Firebase initialization error:', error);
             showSetupInstructions('Error initializing Firebase. Please check your configuration.');
@@ -815,40 +874,16 @@
         const GROUPS_COLLECTION = 'groups';
         const ADMIN_COLLECTION = 'users';
 
-        // Check auth state and create admin if needed
-        async function checkAuthAndCreateAdmin() {
+        // Check auth status
+        async function checkAuthStatus() {
             try {
                 // Check if authentication is enabled
                 await auth.fetchSignInMethodsForEmail('test@example.com');
                 
-                // Check if admin exists in Firestore
-                const adminQuery = await db.collection(ADMIN_COLLECTION)
-                    .where('role', '==', 'admin')
-                    .limit(1)
-                    .get();
+                // Check for any users in Auth (this is tricky, so we'll just show the fix button)
+                document.getElementById('fixAdminBtn').style.display = 'block';
+                document.getElementById('adminCredentialsInfo').style.display = 'block';
                 
-                if (adminQuery.empty) {
-                    // No admin found, show create admin button
-                    document.getElementById('createAdminBtn').style.display = 'block';
-                    document.getElementById('adminCredentialsInfo').style.display = 'block';
-                } else {
-                    // Admin exists, hide create button
-                    document.getElementById('createAdminBtn').style.display = 'none';
-                    
-                    // Check if the admin user exists in Auth
-                    const adminData = adminQuery.docs[0].data();
-                    try {
-                        await auth.signInWithEmailAndPassword('admin@dimax.com', 'admin123');
-                        // If successful, sign out immediately (just to test)
-                        await auth.signOut();
-                    } catch (authError) {
-                        // Admin in Firestore but not in Auth, show create button
-                        if (authError.code === 'auth/user-not-found' || authError.code === 'auth/wrong-password') {
-                            document.getElementById('createAdminBtn').style.display = 'block';
-                            document.getElementById('adminCredentialsInfo').style.display = 'block';
-                        }
-                    }
-                }
             } catch (error) {
                 console.error('Auth check error:', error);
                 if (error.code === 'auth/configuration-not-found') {
@@ -874,18 +909,77 @@
             instructions.style.display = 'block';
         }
 
-        // Create default admin account
-        document.getElementById('createAdminBtn').addEventListener('click', async () => {
+        // Fix Admin Access
+        document.getElementById('fixAdminBtn').addEventListener('click', async () => {
             const messageDiv = document.getElementById('adminLoginMessage');
             
             try {
-                // Create admin in Firebase Auth
-                const adminCredential = await auth.createUserWithEmailAndPassword('admin@dimax.com', 'admin123');
-                const admin = adminCredential.user;
+                // Try to sign in first to see if user exists
+                try {
+                    await auth.signInWithEmailAndPassword('admin@dimax.com', 'admin123');
+                    // If successful, user exists in Auth
+                    const user = auth.currentUser;
+                    
+                    // Check if user exists in Firestore admin collection
+                    const userDoc = await db.collection(ADMIN_COLLECTION).doc(user.uid).get();
+                    
+                    if (!userDoc.exists) {
+                        // Create admin record in Firestore
+                        await db.collection(ADMIN_COLLECTION).doc(user.uid).set({
+                            userId: user.uid,
+                            firstName: 'Admin',
+                            lastName: 'User',
+                            email: 'admin@dimax.com',
+                            role: 'admin',
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                        messageDiv.innerHTML = '✅ Admin record created in Firestore. Please login again.';
+                        messageDiv.className = 'message success';
+                    } else if (userDoc.data().role !== 'admin') {
+                        // Update role to admin
+                        await db.collection(ADMIN_COLLECTION).doc(user.uid).update({
+                            role: 'admin'
+                        });
+                        messageDiv.innerHTML = '✅ User role updated to admin. Please login again.';
+                        messageDiv.className = 'message success';
+                    } else {
+                        messageDiv.innerHTML = '✅ Admin account already exists. Please login.';
+                        messageDiv.className = 'message info';
+                    }
+                    
+                    // Sign out after fixing
+                    await auth.signOut();
+                    
+                } catch (signInError) {
+                    // User doesn't exist in Auth, create new admin
+                    if (signInError.code === 'auth/user-not-found') {
+                        document.getElementById('forceCreateAdminBtn').style.display = 'block';
+                        messageDiv.innerHTML = '❌ Admin user not found in Authentication. Click "Force Create New Admin" to create one.';
+                        messageDiv.className = 'message error';
+                    } else {
+                        throw signInError;
+                    }
+                }
                 
-                // Create admin in Firestore
-                await db.collection(ADMIN_COLLECTION).doc(admin.uid).set({
-                    userId: admin.uid,
+            } catch (error) {
+                console.error('Error fixing admin:', error);
+                messageDiv.innerHTML = '❌ Error fixing admin: ' + error.message;
+                messageDiv.className = 'message error';
+            }
+        });
+
+        // Force Create New Admin
+        document.getElementById('forceCreateAdminBtn').addEventListener('click', async () => {
+            const messageDiv = document.getElementById('adminLoginMessage');
+            
+            try {
+                // Create new admin in Auth
+                const userCredential = await auth.createUserWithEmailAndPassword('admin@dimax.com', 'admin123');
+                const user = userCredential.user;
+                
+                // Create admin record in Firestore
+                await db.collection(ADMIN_COLLECTION).doc(user.uid).set({
+                    userId: user.uid,
                     firstName: 'Admin',
                     lastName: 'User',
                     email: 'admin@dimax.com',
@@ -893,26 +987,23 @@
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 
-                messageDiv.innerHTML = '✅ Default admin account created successfully! You can now login.';
+                messageDiv.innerHTML = '✅ New admin account created successfully! You can now login.';
                 messageDiv.className = 'message success';
                 
-                document.getElementById('createAdminBtn').style.display = 'none';
+                // Hide the force create button
+                document.getElementById('forceCreateAdminBtn').style.display = 'none';
                 
-                // Auto-fill login form
-                document.getElementById('adminEmail').value = 'admin@dimax.com';
-                document.getElementById('adminPassword').value = 'admin123';
+                // Sign out after creating
+                await auth.signOut();
                 
             } catch (error) {
                 console.error('Error creating admin:', error);
-                let errorMessage = '❌ Failed to create admin. ';
                 
                 if (error.code === 'auth/email-already-in-use') {
-                    errorMessage += 'Admin account already exists. Try logging in.';
+                    messageDiv.innerHTML = '❌ Admin account already exists. Try the "Fix Admin Access" button first.';
                 } else {
-                    errorMessage += error.message;
+                    messageDiv.innerHTML = '❌ Error creating admin: ' + error.message;
                 }
-                
-                messageDiv.innerHTML = errorMessage;
                 messageDiv.className = 'message error';
             }
         });
@@ -928,7 +1019,7 @@
             try {
                 const userCredential = await auth.signInWithEmailAndPassword(email, password);
                 
-                // Check if user is admin
+                // Check if user is admin in Firestore
                 const userDoc = await db.collection(ADMIN_COLLECTION).doc(userCredential.user.uid).get();
                 
                 if (userDoc.exists && userDoc.data().role === 'admin') {
@@ -945,14 +1036,15 @@
                     loadStats();
                     loadGroups();
                     loadCodes();
+                    loadUsers();
                     loadUserFilter();
                     loadGroupFilter();
                     setupRealtimeListener();
                 } else {
-                    // Not admin, logout
-                    await auth.signOut();
-                    messageDiv.innerHTML = '❌ Access denied. Admin only.';
+                    // User exists in Auth but not in Firestore admin collection
+                    messageDiv.innerHTML = '❌ Access denied. Your account is not registered as admin. Click "Fix Admin Access" below.';
                     messageDiv.className = 'message error';
+                    await auth.signOut();
                 }
                 
             } catch (error) {
@@ -961,7 +1053,7 @@
                 
                 switch(error.code) {
                     case 'auth/user-not-found':
-                        errorMessage += 'Admin account not found. Click "Create Default Admin Account" below.';
+                        errorMessage += 'Admin account not found. Click "Fix Admin Access" to create one.';
                         break;
                     case 'auth/wrong-password':
                         errorMessage += 'Incorrect password. Use: admin123';
@@ -1001,12 +1093,10 @@
                         loadStats();
                         loadGroups();
                         loadCodes();
+                        loadUsers();
                         loadUserFilter();
                         loadGroupFilter();
                         setupRealtimeListener();
-                    } else {
-                        // Not admin, logout
-                        await auth.signOut();
                     }
                 }
             });
@@ -1026,8 +1116,11 @@
             } else if (tab === 'groups') {
                 tabs[1].classList.add('active');
                 document.getElementById('groupsTab').classList.add('active');
-            } else {
+            } else if (tab === 'users') {
                 tabs[2].classList.add('active');
+                document.getElementById('usersTab').classList.add('active');
+            } else {
+                tabs[3].classList.add('active');
                 document.getElementById('reportsTab').classList.add('active');
             }
         };
@@ -1144,6 +1237,62 @@
                 codesList.appendChild(codeItem);
             }
         }
+
+        // Load Users
+        async function loadUsers() {
+            const usersSnapshot = await db.collection(USERS_COLLECTION).get();
+            const userList = document.getElementById('userList');
+            userList.innerHTML = '';
+            
+            if (usersSnapshot.empty) {
+                userList.innerHTML = '<p>No registered users yet.</p>';
+                return;
+            }
+            
+            usersSnapshot.forEach(doc => {
+                const data = doc.data();
+                const userItem = document.createElement('div');
+                userItem.className = 'user-item';
+                userItem.innerHTML = `
+                    <div>
+                        <strong>${data.firstName} ${data.lastName}</strong><br>
+                        <small>${data.email} | Group: ${data.groupName || 'N/A'}</small>
+                    </div>
+                    <button class="make-admin-btn" onclick="makeAdmin('${doc.id}', '${data.email}')">Make Admin</button>
+                `;
+                userList.appendChild(userItem);
+            });
+        }
+
+        // Make user admin
+        window.makeAdmin = async function(userId, email) {
+            if (confirm(`Are you sure you want to make ${email} an admin?`)) {
+                try {
+                    // Update user role in Firestore
+                    await db.collection(USERS_COLLECTION).doc(userId).update({
+                        role: 'admin'
+                    });
+                    
+                    // Also add to admin collection
+                    const userDoc = await db.collection(USERS_COLLECTION).doc(userId).get();
+                    const userData = userDoc.data();
+                    
+                    await db.collection(ADMIN_COLLECTION).doc(userId).set({
+                        userId: userId,
+                        firstName: userData.firstName,
+                        lastName: userData.lastName,
+                        email: userData.email,
+                        role: 'admin',
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    
+                    alert('User promoted to admin successfully!');
+                    loadUsers();
+                } catch (error) {
+                    alert('Error making user admin: ' + error.message);
+                }
+            }
+        };
 
         // Load Group Select for Code Generation
         async function loadGroupSelect() {
