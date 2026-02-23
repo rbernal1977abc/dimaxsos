@@ -38,7 +38,6 @@
             justify-content: center;
             align-items: center;
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            overflow-y: auto;
             padding: 10px;
         }
 
@@ -49,16 +48,13 @@
         }
 
         .container {
-            max-width: 400px;
+            max-width: 380px;
             width: 100%;
             background: white;
             border-radius: 24px;
             box-shadow: 0 20px 40px rgba(0,0,0,0.4);
             overflow: hidden;
             animation: slideUp 0.4s ease;
-            display: flex;
-            flex-direction: column;
-            max-height: 98vh;
         }
 
         @keyframes slideUp {
@@ -74,44 +70,28 @@
 
         .landing-header {
             background: linear-gradient(135deg, #ff4d4d 0%, #cc0000 100%);
-            padding: 20px 15px;
+            padding: 25px 15px;
             text-align: center;
             color: white;
-            position: relative;
-            overflow: hidden;
-            flex-shrink: 0;
-        }
-
-        .landing-header::before {
-            content: "🚨";
-            position: absolute;
-            right: -10px;
-            top: -10px;
-            font-size: 80px;
-            opacity: 0.1;
-            transform: rotate(15deg);
         }
 
         .landing-logo {
-            font-size: 32px;
+            font-size: 34px;
             font-weight: 900;
             display: block;
-            text-shadow: 2px 2px 0 rgba(0,0,0,0.2);
             letter-spacing: 1px;
-            margin-bottom: 3px;
+            margin-bottom: 5px;
         }
 
         .landing-sub {
             font-size: 14px;
             opacity: 0.9;
             display: block;
-            font-style: italic;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
         }
 
         .landing-tagline {
             font-size: 11px;
-            opacity: 0.9;
             display: inline-block;
             background: rgba(255,255,255,0.2);
             padding: 4px 12px;
@@ -121,9 +101,6 @@
         .content-scroll {
             padding: 20px 15px;
             background: white;
-            flex: 1;
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
         }
 
         .footer {
@@ -133,19 +110,12 @@
             color: #666;
             font-size: 11px;
             border-top: 1px solid #e0e0e0;
-            flex-shrink: 0;
-        }
-
-        .footer .company {
-            color: #ff4d4d;
-            font-weight: 600;
         }
 
         .tab-container {
             display: flex;
             margin-bottom: 20px;
             border-bottom: 2px solid #e0e0e0;
-            flex-shrink: 0;
         }
 
         .tab {
@@ -155,7 +125,6 @@
             cursor: pointer;
             color: #666;
             font-weight: 600;
-            transition: all 0.3s ease;
             font-size: 15px;
         }
 
@@ -165,7 +134,6 @@
         }
 
         .form-container {
-            transition: all 0.3s ease;
             display: none;
         }
 
@@ -198,8 +166,6 @@
             border: 2px solid #e0e0e0;
             border-radius: 10px;
             font-size: 14px;
-            transition: border 0.3s ease;
-            -webkit-appearance: none;
             background: white;
         }
 
@@ -218,31 +184,26 @@
             font-size: 16px;
             font-weight: bold;
             cursor: pointer;
-            transition: all 0.2s ease;
             text-transform: uppercase;
-            letter-spacing: 1px;
-            -webkit-appearance: none;
         }
 
         .btn-primary:active {
             transform: scale(0.98);
-            opacity: 0.9;
         }
 
+        /* SOS Page - Compact */
         .sos-page {
             display: none;
+            max-width: 380px;
             width: 100%;
-            max-width: 400px;
             background: white;
             border-radius: 24px;
             overflow: hidden;
             box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-            flex-direction: column;
-            max-height: 98vh;
         }
 
         .sos-page.active {
-            display: flex;
+            display: block;
         }
 
         .sos-header {
@@ -250,56 +211,50 @@
             padding: 15px;
             text-align: center;
             color: white;
-            flex-shrink: 0;
         }
 
         .sos-logo {
-            font-size: 26px;
+            font-size: 24px;
             font-weight: 900;
             display: block;
-            letter-spacing: 1px;
-            line-height: 1.2;
         }
 
         .sos-content {
-            padding: 20px 15px;
+            padding: 15px;
             background: white;
-            flex: 1;
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
         }
 
         .user-info-card {
             background: #f8f9fa;
-            padding: 15px;
-            border-radius: 14px;
-            margin-bottom: 20px;
+            padding: 12px;
+            border-radius: 12px;
+            margin-bottom: 15px;
             text-align: center;
             border-left: 4px solid #ff4d4d;
         }
 
         .user-name-display {
-            font-size: 22px;
+            font-size: 20px;
             font-weight: bold;
             color: #333;
-            margin-bottom: 5px;
         }
 
         .user-group-display {
             color: #ff4d4d;
             font-weight: 600;
-            font-size: 15px;
+            font-size: 14px;
+            margin-top: 3px;
         }
 
         .sos-button-container {
             display: flex;
             justify-content: center;
-            margin: 15px 0 20px;
+            margin: 10px 0 15px;
         }
 
         .sos-button {
-            width: 200px;
-            height: 200px;
+            width: 180px;
+            height: 180px;
             border-radius: 50%;
             background: linear-gradient(135deg, #ff4d4d, #cc0000);
             border: 6px solid #ffb3b3;
@@ -318,202 +273,82 @@
             transform: scale(0.92);
             border-color: #ff4d4d;
             background: linear-gradient(135deg, #b30000, #800000);
-            box-shadow: inset 0 0 25px rgba(0,0,0,0.5);
             animation: pulse 1.5s infinite;
         }
 
         @keyframes pulse {
-            0% {
-                box-shadow: 0 0 0 0 rgba(255,68,68,0.7), inset 0 0 20px rgba(0,0,0,0.3);
-            }
-            70% {
-                box-shadow: 0 0 0 15px rgba(255,68,68,0), inset 0 0 20px rgba(0,0,0,0.3);
-            }
-            100% {
-                box-shadow: 0 0 0 0 rgba(255,68,68,0), inset 0 0 20px rgba(0,0,0,0.3);
-            }
+            0% { box-shadow: 0 0 0 0 rgba(255,68,68,0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(255,68,68,0); }
+            100% { box-shadow: 0 0 0 0 rgba(255,68,68,0); }
         }
 
         .sos-text {
-            font-size: 48px;
-            margin-bottom: 2px;
+            font-size: 44px;
             font-weight: 900;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-            line-height: 1;
         }
 
         .sos-engaged {
             font-size: 16px;
             font-weight: 700;
-            letter-spacing: 1px;
-            margin: 2px 0;
         }
 
         .sos-press-to-stop {
-            font-size: 13px;
-            font-weight: 500;
-            opacity: 0.9;
+            font-size: 12px;
             margin-top: 2px;
         }
 
         .sos-instruction {
-            font-size: 14px;
-            font-weight: 500;
+            font-size: 13px;
             text-align: center;
-            padding: 0 8px;
-            line-height: 1.3;
+            padding: 0 5px;
         }
 
         .status-message {
-            margin: 15px 0;
-            padding: 12px;
-            border-radius: 10px;
-            font-weight: 500;
-            font-size: 14px;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 13px;
             text-align: center;
         }
 
-        .success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-
-        .error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-
-        .info {
-            background: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-        }
-
-        .warning {
-            background: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeeba;
-        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
 
         .emergency-history {
-            margin-top: 20px;
-            text-align: left;
+            margin-top: 15px;
         }
 
         .emergency-history h3 {
             color: #333;
-            margin-bottom: 12px;
-            font-size: 17px;
+            margin-bottom: 10px;
+            font-size: 16px;
         }
 
         .history-item {
             background: #f8f9fa;
-            padding: 12px;
-            border-radius: 10px;
-            margin-bottom: 8px;
-            border-left: 4px solid;
-            transition: all 0.2s ease;
-            font-size: 13px;
-        }
-
-        .history-item.active {
-            border-left-color: #ff4d4d;
-            background: #fff3f3;
-        }
-
-        .history-item.in-progress {
-            border-left-color: #ffc107;
-            background: #fff8e7;
-        }
-
-        .history-item.completed {
-            border-left-color: #28a745;
-            background: #f0f0f0;
-            opacity: 0.8;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 6px;
+            border-left: 4px solid #ff4d4d;
+            font-size: 12px;
         }
 
         .history-item small {
             color: #666;
             display: block;
-            margin-top: 5px;
-            font-size: 11px;
-        }
-
-        .history-status {
-            display: inline-block;
-            padding: 2px 6px;
-            border-radius: 10px;
+            margin-top: 4px;
             font-size: 10px;
-            font-weight: bold;
-            margin-left: 6px;
         }
 
-        .status-active {
-            background: #ff4d4d;
-            color: white;
-        }
-
-        .status-in-progress {
-            background: #ffc107;
-            color: #333;
-        }
-
-        .status-completed {
-            background: #28a745;
-            color: white;
-        }
-
-        .permission-note {
-            font-size: 12px;
+        .location-note {
+            font-size: 11px;
             color: #666;
             text-align: center;
-            margin: 10px 0;
-            padding: 10px;
+            margin: 8px 0;
+            padding: 6px;
             background: #f8f9fa;
-            border-radius: 8px;
-            border-left: 3px solid #ffc107;
-        }
-
-        .permission-note.warning {
-            background: #fff3cd;
-            border-left-color: #ff4d4d;
-            color: #856404;
-        }
-
-        .permission-note.success {
-            background: #d4edda;
-            border-left-color: #28a745;
-            color: #155724;
-        }
-
-        .view-location-btn {
-            background: #17a2b8;
-            color: white;
-            border: none;
-            padding: 10px;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 500;
-            cursor: pointer;
-            margin: 10px 0;
-            width: 100%;
-        }
-
-        .ios-settings-note {
-            background: #e7f3ff;
-            border: 1px solid #b8daff;
-            color: #004085;
-            padding: 12px;
-            border-radius: 8px;
-            font-size: 13px;
-            margin: 10px 0;
-            text-align: center;
-        }
-
-        .hidden {
-            display: none !important;
+            border-radius: 6px;
         }
     </style>
 </head>
@@ -546,7 +381,7 @@
                         </div>
                         <button type="submit" class="btn-primary">Mag-login</button>
                     </form>
-                    <div id="loginMessage" style="margin-top: 15px;"></div>
+                    <div id="loginMessage" style="margin-top: 10px;"></div>
                 </div>
 
                 <div id="registerForm" class="form-container">
@@ -566,7 +401,7 @@
                         </div>
                         <div class="form-group">
                             <label>Password</label>
-                            <input type="password" id="regPassword" placeholder="Minimum 6 characters" required minlength="6">
+                            <input type="password" id="regPassword" placeholder="6+ characters" required minlength="6">
                         </div>
                         <div class="form-group">
                             <label>Contact Number</label>
@@ -578,7 +413,7 @@
                         </div>
                         <button type="submit" class="btn-primary">Magparehistro</button>
                     </form>
-                    <div id="registerMessage" style="margin-top: 15px;"></div>
+                    <div id="registerMessage" style="margin-top: 10px;"></div>
                 </div>
             </div>
 
@@ -608,28 +443,10 @@
                 </div>
                 
                 <div id="sosStatus" class="status-message"></div>
-                
-                <!-- Location Permission Note -->
-                <div id="permissionNote" class="permission-note">
-                    📍 I-share ang location para sa mas mabilis na rescue
-                </div>
-                
-                <!-- iOS Settings Note (shown when location is blocked) -->
-                <div id="iosSettingsNote" class="ios-settings-note hidden">
-                    ⚙️ Location is blocked. To enable:<br>
-                    1. Go to Settings → Safari<br>
-                    2. Tap "Location"<br>
-                    3. Select "While Using"<br>
-                    4. Refresh this page
-                </div>
-                
-                <!-- View Location Button -->
-                <button id="viewLocationBtn" class="view-location-btn hidden" onclick="viewCurrentLocation()">
-                    📍 View My Location
-                </button>
+                <div id="locationNote" class="location-note">📍 Ibahagi ang location para sa rescue</div>
                 
                 <div id="emergencyHistory" class="emergency-history">
-                    <h3>📋 Kasaysayan ng Emergency</h3>
+                    <h3>📋 Kasaysayan</h3>
                     <div id="historyList"></div>
                 </div>
             </div>
@@ -646,14 +463,9 @@
             appId: "1:1003766190116:web:921944e615fa39260a08b1"
         };
 
-        // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
-
-        // Enable offline persistence
-        db.enablePersistence()
-            .catch(err => console.log('Persistence error:', err));
 
         const USERS_COLLECTION = 'registered_users';
         const EMERGENCIES_COLLECTION = 'emergencies';
@@ -665,22 +477,14 @@
         let currentEmergencyId = null;
         let currentUser = null;
         let currentLocation = null;
-        let locationPermissionState = 'prompt'; // 'prompt', 'granted', 'denied'
 
-        // Auth state observer
         auth.onAuthStateChanged(async (user) => {
             if (user) {
-                try {
-                    const userDoc = await db.collection(USERS_COLLECTION).doc(user.uid).get();
-                    if (userDoc.exists) {
-                        currentUser = userDoc.data();
-                        showSOSPage();
-                        // Don't auto-check for active emergency - always start disengaged
-                        loadHistory();
-                        checkLocationPermission();
-                    }
-                } catch (error) {
-                    console.error('Error loading user:', error);
+                const userDoc = await db.collection(USERS_COLLECTION).doc(user.uid).get();
+                if (userDoc.exists) {
+                    currentUser = userDoc.data();
+                    showSOSPage();
+                    loadHistory();
                 }
             } else {
                 showLandingPage();
@@ -694,12 +498,11 @@
             if (currentUser.groupName) {
                 document.getElementById('groupBadge').textContent = `👥 ${currentUser.groupName}`;
             }
-            
-            // Ensure SOS is not active on page load
+            // Ensure SOS starts disengaged
             isSOSActive = false;
             currentEmergencyId = null;
             sosButton.classList.remove('active');
-            updateButtonText(false);
+            document.querySelector('.sos-instruction').innerHTML = 'Pindutin kung may emergency';
         }
 
         function showLandingPage() {
@@ -707,25 +510,14 @@
             document.getElementById('sosPage').classList.remove('active');
         }
 
-        function updateButtonText(isActive) {
-            const sosInstruction = document.querySelector('.sos-instruction');
-            if (isActive) {
-                sosInstruction.innerHTML = '<span class="sos-engaged">ENGAGED</span><br><span class="sos-press-to-stop">PRESS TO STOP</span>';
-            } else {
-                sosInstruction.innerHTML = 'Pindutin kung may emergency';
-            }
-        }
-
         window.switchTab = function(tab) {
-            const tabs = document.querySelectorAll('.tab');
-            const forms = document.querySelectorAll('.form-container');
-            tabs.forEach(t => t.classList.remove('active'));
-            forms.forEach(f => f.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.form-container').forEach(f => f.classList.remove('active'));
             if (tab === 'login') {
-                tabs[0].classList.add('active');
+                document.querySelectorAll('.tab')[0].classList.add('active');
                 document.getElementById('loginForm').classList.add('active');
             } else {
-                tabs[1].classList.add('active');
+                document.querySelectorAll('.tab')[1].classList.add('active');
                 document.getElementById('registerForm').classList.add('active');
             }
         };
@@ -733,10 +525,11 @@
         // Login
         document.getElementById('loginFormElement').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const email = document.getElementById('loginEmail').value;
-            const password = document.getElementById('loginPassword').value;
             try {
-                await auth.signInWithEmailAndPassword(email, password);
+                await auth.signInWithEmailAndPassword(
+                    document.getElementById('loginEmail').value,
+                    document.getElementById('loginPassword').value
+                );
             } catch (error) {
                 document.getElementById('loginMessage').innerHTML = '❌ ' + error.message;
             }
@@ -745,16 +538,9 @@
         // Register
         document.getElementById('registerFormElement').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const firstName = document.getElementById('firstName').value;
-            const lastName = document.getElementById('lastName').value;
-            const email = document.getElementById('regEmail').value;
-            const password = document.getElementById('regPassword').value;
-            const contactNumber = document.getElementById('contactNumber').value;
-            const regCode = document.getElementById('regCode').value;
-
             try {
                 const codeSnapshot = await db.collection(CODES_COLLECTION)
-                    .where('code', '==', regCode)
+                    .where('code', '==', document.getElementById('regCode').value)
                     .where('used', '==', false)
                     .get();
 
@@ -764,20 +550,21 @@
                 }
 
                 const codeData = codeSnapshot.docs[0].data();
-                
                 const groupDoc = await db.collection(GROUPS_COLLECTION).doc(codeData.groupId).get();
-                const groupName = groupDoc.exists ? groupDoc.data().name : 'Unknown';
-
-                const userCred = await auth.createUserWithEmailAndPassword(email, password);
                 
+                const userCred = await auth.createUserWithEmailAndPassword(
+                    document.getElementById('regEmail').value,
+                    document.getElementById('regPassword').value
+                );
+
                 await db.collection(USERS_COLLECTION).doc(userCred.user.uid).set({
                     userId: userCred.user.uid,
-                    firstName: firstName,
-                    lastName: lastName,
-                    email: email,
-                    contactNumber: contactNumber,
+                    firstName: document.getElementById('firstName').value,
+                    lastName: document.getElementById('lastName').value,
+                    email: document.getElementById('regEmail').value,
+                    contactNumber: document.getElementById('contactNumber').value,
                     groupId: codeData.groupId,
-                    groupName: groupName,
+                    groupName: groupDoc.exists ? groupDoc.data().name : 'Unknown',
                     registeredAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
 
@@ -791,37 +578,7 @@
             }
         });
 
-        // Check location permission
-        function checkLocationPermission() {
-            if (!navigator.geolocation) {
-                showPermissionNote('Geolocation not supported', 'warning');
-                return;
-            }
-            
-            if (navigator.permissions) {
-                navigator.permissions.query({ name: 'geolocation' }).then(result => {
-                    locationPermissionState = result.state;
-                    
-                    if (result.state === 'granted') {
-                        showPermissionNote('📍 Location access granted', 'success');
-                    } else if (result.state === 'prompt') {
-                        showPermissionNote('📍 Ibahagi ang location para sa rescue', 'info');
-                    } else if (result.state === 'denied') {
-                        locationPermissionState = 'denied';
-                        showPermissionNote('⚠️ Location blocked. Enable in Settings → Safari → Location', 'warning');
-                        document.getElementById('iosSettingsNote').classList.remove('hidden');
-                    }
-                });
-            }
-        }
-
-        function showPermissionNote(message, type) {
-            const note = document.getElementById('permissionNote');
-            note.textContent = message;
-            note.className = 'permission-note ' + type;
-        }
-
-        // Request location - handles iOS "Never" setting
+        // Simple location request - this triggers Safari popup
         function requestLocation() {
             return new Promise((resolve, reject) => {
                 if (!navigator.geolocation) {
@@ -829,44 +586,18 @@
                     return;
                 }
                 
-                // Check if permission is denied
-                if (locationPermissionState === 'denied') {
-                    // Show iOS settings instructions
-                    document.getElementById('iosSettingsNote').classList.remove('hidden');
-                    reject(new Error('Location blocked in settings'));
-                    return;
-                }
-                
-                // For iOS, we need to ensure this is called from a user gesture
-                // and with the right options
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        locationPermissionState = 'granted';
-                        document.getElementById('iosSettingsNote').classList.add('hidden');
-                        resolve(position);
-                    },
-                    (error) => {
-                        console.log('Location error:', error);
-                        
-                        if (error.code === 1) { // PERMISSION_DENIED
-                            locationPermissionState = 'denied';
-                            document.getElementById('iosSettingsNote').classList.remove('hidden');
-                        }
-                        reject(error);
-                    },
-                    {
-                        enableHighAccuracy: true,
-                        timeout: 30000,
-                        maximumAge: 0
-                    }
-                );
+                // This simple call triggers the browser's native permission popup
+                navigator.geolocation.getCurrentPosition(resolve, reject, {
+                    enableHighAccuracy: true,
+                    timeout: 30000,
+                    maximumAge: 0
+                });
             });
         }
 
         // Start tracking
         function startTracking(emergencyId) {
             if (!navigator.geolocation) return;
-            if (locationPermissionState !== 'granted') return;
             
             watchId = navigator.geolocation.watchPosition(
                 async (position) => {
@@ -876,24 +607,17 @@
                     };
                     
                     if (emergencyId) {
-                        try {
-                            await db.collection(EMERGENCIES_COLLECTION).doc(emergencyId).update({
-                                location: currentLocation,
-                                lastUpdate: firebase.firestore.FieldValue.serverTimestamp()
-                            });
-                            
-                            document.getElementById('viewLocationBtn').classList.remove('hidden');
-                        } catch (error) {
-                            console.error('Update error:', error);
-                        }
+                        await db.collection(EMERGENCIES_COLLECTION).doc(emergencyId).update({
+                            location: currentLocation,
+                            lastUpdate: firebase.firestore.FieldValue.serverTimestamp()
+                        });
                     }
                 },
-                (error) => console.error('Watch error:', error),
-                { enableHighAccuracy: true, timeout: 5000 }
+                (error) => console.log('Watch error:', error),
+                { enableHighAccuracy: true }
             );
         }
 
-        // Stop tracking
         function stopTracking() {
             if (watchId) {
                 navigator.geolocation.clearWatch(watchId);
@@ -901,99 +625,55 @@
             }
         }
 
-        // View current location
-        window.viewCurrentLocation = function() {
-            if (currentLocation) {
-                window.open(`https://www.google.com/maps?q=${currentLocation.lat},${currentLocation.lng}`, '_blank');
-            } else {
-                alert('No location available');
-            }
-        };
-
-        // Load history
         async function loadHistory() {
             if (!auth.currentUser) return;
             
-            try {
-                const snapshot = await db.collection(EMERGENCIES_COLLECTION)
-                    .where('userId', '==', auth.currentUser.uid)
-                    .orderBy('timestamp', 'desc')
-                    .limit(10)
-                    .get();
-                
-                const list = document.getElementById('historyList');
-                list.innerHTML = '';
-                
-                if (snapshot.empty) {
-                    list.innerHTML = '<p style="text-align:center;color:#666;">Walang record</p>';
-                    return;
-                }
-                
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    const date = data.timestamp ? new Date(data.timestamp.seconds * 1000).toLocaleString() : 'Unknown';
-                    const div = document.createElement('div');
-                    div.className = 'history-item';
-                    
-                    if (data.status === 'active') {
-                        div.classList.add('active');
-                    } else if (data.status === 'in-progress') {
-                        div.classList.add('in-progress');
-                    } else if (data.status === 'completed') {
-                        div.classList.add('completed');
-                    }
-                    
-                    let statusText = '';
-                    let statusClass = '';
-                    
-                    if (data.status === 'active') {
-                        statusText = 'Active';
-                        statusClass = 'status-active';
-                    } else if (data.status === 'in-progress') {
-                        statusText = 'Being Handled';
-                        statusClass = 'status-in-progress';
-                    } else if (data.status === 'completed') {
-                        statusText = 'Completed';
-                        statusClass = 'status-completed';
-                    }
-                    
-                    div.innerHTML = `
-                        <strong>🚨 Emergency</strong>
-                        <span class="history-status ${statusClass}">${statusText}</span><br>
+            const snapshot = await db.collection(EMERGENCIES_COLLECTION)
+                .where('userId', '==', auth.currentUser.uid)
+                .orderBy('timestamp', 'desc')
+                .limit(5)
+                .get();
+            
+            const list = document.getElementById('historyList');
+            list.innerHTML = '';
+            
+            if (snapshot.empty) {
+                list.innerHTML = '<p style="text-align:center;color:#666;">Walang record</p>';
+                return;
+            }
+            
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                const date = data.timestamp ? new Date(data.timestamp.seconds * 1000).toLocaleString() : 'Unknown';
+                list.innerHTML += `
+                    <div class="history-item">
+                        <strong>🚨 Emergency</strong><br>
                         ${data.location ? '📍 With location' : '📍 No location'}<br>
                         <small>📅 ${date}</small>
-                    `;
-                    list.appendChild(div);
-                });
-            } catch (error) {
-                console.error('History error:', error);
-            }
+                    </div>
+                `;
+            });
         }
 
         // SOS Button
         const sosButton = document.getElementById('sosButton');
         const statusDiv = document.getElementById('sosStatus');
-        const permissionNote = document.getElementById('permissionNote');
+        const locationNote = document.getElementById('locationNote');
 
         sosButton.addEventListener('click', async () => {
             if (isSOSActive) {
-                // User pressed STOP - stop tracking but DON'T change status
+                // STOP Pressed
                 stopTracking();
-                
                 isSOSActive = false;
                 currentEmergencyId = null;
                 sosButton.classList.remove('active');
-                
-                // Reset button text
-                updateButtonText(false);
-                
+                document.querySelector('.sos-instruction').innerHTML = 'Pindutin kung may emergency';
                 statusDiv.innerHTML = '✅ Tracking stopped';
                 statusDiv.className = 'status-message info';
-                
-                document.getElementById('viewLocationBtn').classList.add('hidden');
+                locationNote.innerHTML = '📍 Ibahagi ang location para sa rescue';
                 
             } else {
-                // Activate - send SOS immediately
+                // SOS Pressed - Activate immediately
                 statusDiv.innerHTML = '📍 Ina-activate...';
                 statusDiv.className = 'status-message info';
                 
@@ -1004,7 +684,7 @@
                     const userDoc = await db.collection(USERS_COLLECTION).doc(user.uid).get();
                     const userData = userDoc.data();
 
-                    // Create emergency
+                    // Send SOS immediately without location
                     const emergencyData = {
                         userId: user.uid,
                         userName: `${userData.firstName} ${userData.lastName}`,
@@ -1012,8 +692,7 @@
                         groupId: userData.groupId,
                         groupName: userData.groupName,
                         timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                        status: 'active',
-                        createdAt: new Date().toISOString()
+                        status: 'active'
                     };
 
                     const docRef = await db.collection(EMERGENCIES_COLLECTION).add(emergencyData);
@@ -1022,14 +701,12 @@
                     // Update UI
                     isSOSActive = true;
                     sosButton.classList.add('active');
-                    updateButtonText(true);
-                    
-                    statusDiv.innerHTML = '✅ SOS sent - Binabasa ang lokasyon...';
+                    document.querySelector('.sos-instruction').innerHTML = '<span class="sos-engaged">ENGAGED</span><br><span class="sos-press-to-stop">PRESS TO STOP</span>';
+                    statusDiv.innerHTML = '✅ SOS Sent - Getting location...';
 
-                    // Try to get location - this will trigger browser popup
+                    // NOW ask for location - this triggers Safari popup
                     try {
-                        permissionNote.innerHTML = '📍 Hinihingi ang permission para sa location...';
-                        
+                        locationNote.innerHTML = '📍 Asking for location...';
                         const position = await requestLocation();
                         
                         currentLocation = {
@@ -1038,74 +715,29 @@
                         };
                         
                         await db.collection(EMERGENCIES_COLLECTION).doc(currentEmergencyId).update({
-                            location: currentLocation,
-                            hasLocation: true
+                            location: currentLocation
                         });
                         
-                        statusDiv.innerHTML = '✅ SOS active - Location shared';
-                        showPermissionNote('📍 Location shared - Salamat!', 'success');
-                        
-                        document.getElementById('viewLocationBtn').classList.remove('hidden');
-                        document.getElementById('iosSettingsNote').classList.add('hidden');
-                        
+                        statusDiv.innerHTML = '✅ SOS Active - Location shared';
+                        locationNote.innerHTML = '📍 Location shared';
                         startTracking(currentEmergencyId);
                         
                     } catch (locError) {
                         console.log('Location error:', locError);
-                        
-                        if (locError.code === 1) {
-                            showPermissionNote('⚠️ Location denied. Enable in Settings if needed.', 'warning');
-                            document.getElementById('iosSettingsNote').classList.remove('hidden');
-                        } else if (locError.code === 2) {
-                            showPermissionNote('📍 Location unavailable', 'warning');
-                        } else if (locError.code === 3) {
-                            showPermissionNote('📍 Location timeout', 'warning');
-                        }
-                        
-                        statusDiv.innerHTML = '✅ SOS active - No location';
+                        statusDiv.innerHTML = '✅ SOS Active - No location';
+                        locationNote.innerHTML = '📍 Location not shared';
                     }
                     
                     loadHistory();
 
                 } catch (error) {
                     console.error('SOS error:', error);
-                    statusDiv.innerHTML = '❌ Failed: ' + error.message;
+                    statusDiv.innerHTML = '❌ Failed';
                     statusDiv.className = 'status-message error';
                     sosButton.classList.remove('active');
-                    updateButtonText(false);
                 }
             }
         });
-
-        // Listen for status changes
-        if (auth.currentUser) {
-            db.collection(EMERGENCIES_COLLECTION)
-                .where('userId', '==', auth.currentUser?.uid)
-                .where('status', 'in', ['active', 'in-progress'])
-                .onSnapshot((snapshot) => {
-                    snapshot.docChanges().forEach((change) => {
-                        if (change.type === 'modified') {
-                            const data = change.doc.data();
-                            if (data.status === 'in-progress') {
-                                statusDiv.innerHTML = '🟡 Emergency is now being handled';
-                                statusDiv.className = 'status-message warning';
-                            } else if (data.status === 'completed') {
-                                statusDiv.innerHTML = '✅ Emergency resolved';
-                                statusDiv.className = 'status-message success';
-                                
-                                if (change.doc.id === currentEmergencyId) {
-                                    isSOSActive = false;
-                                    currentEmergencyId = null;
-                                    sosButton.classList.remove('active');
-                                    updateButtonText(false);
-                                    stopTracking();
-                                }
-                            }
-                            loadHistory();
-                        }
-                    });
-                });
-        }
     </script>
 </body>
 </html>
