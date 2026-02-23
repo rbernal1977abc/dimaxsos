@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DIMAX SOS - Admin Dashboard</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: #1a1a2e;
+        }
+
+        .dashboard {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .dashboard-header {
+            background: linear-gradient(135deg, #ff4d4d, #cc0000);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            box-shadow: 0 10px 30px rgba(255,77,77,0.3);
+        }
+
+        .dashboard-header h1 {
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .admin-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .btn-admin {
+            background: white;
+            color: #ff4d4d;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .btn-admin:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .code-display {
+            background: rgba(255,255,255,0.2);
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 16px;
+        }
+
+        .section {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 2px solid #ff4d4d;
+            padding-bottom: 10px;
+        }
+
+        .emergency-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .emergency-card {
+            background: #fff3f3;
+            border-left: 5px solid #ff4d4d;
+            padding: 20px;
+            border-radius: 10px;
+            position: relative;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .emergency-card h3 {
+            color: #ff4d4d;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+
+        .emergency-card .time {
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+
+        .emergency-card .location {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+
+        .emergency-card .actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn-map {
+            background: #ff4d4d;
+            color: white;
+            text-decoration: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            font-size: 14px;
+            display: inline-block;
+            transition: background 0.3s ease;
+        }
+
+        .btn-map:hover {
+            background: #cc0000;
+        }
+
+        .btn-resolve {
+            background: #4caf50;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s ease;
+        }
+
+        .btn-resolve:hover {
+            background: #45a049;
+        }
+
+        .report-filters {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+
+        .report-filters select,
+        .report-filters input {
+            padding: 10px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            min-width: 200px;
+        }
+
+        .report-filters select:focus,
+        .report-filters input:focus {
+            outline: none;
+            border-color: #ff4d4d;
+        }
+
+        .btn-report,
+        .btn-reset {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.2s ease;
+        }
+
+        .btn-report:hover,
+        .btn-reset:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn-report {
+            background: #ff4d4d;
+            color: white;
+        }
+
+        .btn-reset {
+            background: #6c757d;
+            color: white;
+        }
+
+        .report-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .report-table th,
+        .report-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .report-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .report-table tr:hover {
+            background: #f5f5f5;
+        }
+
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .status-active {
+            background: #ff4d4d;
+            color: white;
+        }
+
+        .status-resolved {
+            background: #4caf50;
+            color: white;
+        }
+
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #ff4d4d, #cc0000);
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            color: white;
+            box-shadow: 0 5px 15px rgba(255,77,77,0.3);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-number {
+            font-size: 42px;
+            font-weight: bold;
+            display: block;
+            line-height: 1.2;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: white;
+            font-size: 12px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            margin-top: 30px;
+        }
+
+        .footer .company {
+            color: #ff4d4d;
+            font-weight: bold;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-header {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+            
+            .emergency-list {
+                grid-template-columns: 1fr;
+            }
+            
+            .report-filters {
+                flex-direction: column;
+            }
+            
+            .report-filters select,
+            .report-filters input,
+            .report-filters button {
+                width: 100%;
+            }
+        }
+
+        .dimax-badge {
+            background: rgba(255,255,255,0.2);
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            display: inline-block;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="dashboard-header">
+            <h1>
+                <span>🚨 DIMAX SOS</span>
+                <span class="dimax-badge">Admin Portal</span>
+            </h1>
+            <div class="admin-controls">
+                <button id="generateCodeBtn" class="btn-admin">Generate Registration Code</button>
+                <span id="newCodeDisplay" class="code-display"></span>
+            </div>
+        </div>
+
+        <!-- Summary Stats -->
+        <div class="summary-stats">
+            <div class="stat-card">
+                <span class="stat-number" id="totalUsers">0</span>
+                <span class="stat-label">Registered Users</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-number" id="activeEmergencies">0</span>
+                <span class="stat-label">Active Emergencies</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-number" id="totalEmergencies">0</span>
+                <span class="stat-label">Total Emergencies</span>
+            </div>
+        </div>
+
+        <!-- Live Emergencies Section -->
+        <div class="section">
+            <h2>🚨 Live DIMAX Emergencies</h2>
+            <div id="liveEmergencies" class="emergency-list">
+                <!-- Live emergencies will appear here -->
+            </div>
+        </div>
+
+        <!-- Reports Section -->
+        <div class="section">
+            <h2>📊 DIMAX Emergency Reports</h2>
+            
+            <div class="report-filters">
+                <select id="userFilter">
+                    <option value="">All Users</option>
+                </select>
+                <input type="month" id="monthFilter">
+                <button id="generateReport" class="btn-report">Generate Report</button>
+                <button id="resetFilters" class="btn-reset">Reset</button>
+            </div>
+
+            <div id="reportResults">
+                <!-- Report table will appear here -->
+            </div>
+        </div>
+
+        <div class="footer">
+            <span>🚨 DIMAX SOS Emergency Response System</span><br>
+            <span>Developed and Patented by <span class="company">RP8 & Dimax</span></span><br>
+            <span>Philippine Patent No. DIMAX-2024-001 • All Rights Reserved</span>
+        </div>
+    </div>
+
+    <script>
+        // Firebase Configuration (Same as main app)
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // Collections
+        const USERS_COLLECTION = 'dimax_users';
+        const EMERGENCIES_COLLECTION = 'dimax_emergencies';
+        const CODES_COLLECTION = 'dimax_registration_codes';
+
+        // Load initial data
+        loadLiveEmergencies();
+        loadStats();
+        loadUserFilter();
+        setupRealtimeListener();
+
+        // Generate Registration Code
+        document.getElementById('generateCodeBtn').addEventListener('click', async () => {
+            const code = generateCode();
+            try {
+                await db.collection(CODES_COLLECTION).add({
+                    code: code,
+                    used: false,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdBy: 'admin'
+                });
+                document.getElementById('newCodeDisplay').textContent = `New DIMAX Code: ${code}`;
+                setTimeout(() => {
+                    document.getElementById('newCodeDisplay').textContent = '';
+                }, 10000);
+            } catch (error) {
+                alert('Error generating code: ' + error.message);
+            }
+        });
+
+        function generateCode() {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let code = 'DIMAX-';
+            for (let i = 0; i < 6; i++) {
+                code += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return code;
+        }
+
+        // Load Live Emergencies
+        function loadLiveEmergencies() {
+            db.collection(EMERGENCIES_COLLECTION)
+                .where('status', '==', 'active')
+                .orderBy('timestamp', 'desc')
+                .onSnapshot((snapshot) => {
+                    const emergenciesDiv = document.getElementById('liveEmergencies');
+                    emergenciesDiv.innerHTML = '';
+                    
+                    if (snapshot.empty) {
+                        emergenciesDiv.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">No active DIMAX emergencies</p>';
+                        return;
+                    }
+                    
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        const time = data.timestamp ? new Date(data.timestamp.seconds * 1000).toLocaleString('en-PH') : 'Just now';
+                        
+                        const card = document.createElement('div');
+                        card.className = 'emergency-card';
+                        card.innerHTML = `
+                            <h3>🚨 DIMAX ALERT: ${data.userName}</h3>
+                            <div class="time">📅 ${time}</div>
+                            <div class="location">
+                                📍 Latitude: ${data.location?.lat || 'Unknown'}<br>
+                                📍 Longitude: ${data.location?.lng || 'Unknown'}
+                            </div>
+                            <p>📞 Contact: ${data.contactNumber}</p>
+                            <div class="actions">
+                                <a href="${data.googleMapsLink || '#'}" target="_blank" class="btn-map">View on Google Maps</a>
+                                <button onclick="resolveEmergency('${doc.id}')" class="btn-resolve">Mark Resolved</button>
+                            </div>
+                        `;
+                        emergenciesDiv.appendChild(card);
+                    });
+                });
+        }
+
+        // Resolve Emergency
+        window.resolveEmergency = async function(emergencyId) {
+            if (confirm('Mark this DIMAX emergency as resolved?')) {
+                try {
+                    await db.collection(EMERGENCIES_COLLECTION).doc(emergencyId).update({
+                        status: 'resolved',
+                        resolvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        resolvedBy: 'admin'
+                    });
+                } catch (error) {
+                    alert('Error: ' + error.message);
+                }
+            }
+        };
+
+        // Load Stats
+        async function loadStats() {
+            // Total Users
+            const usersSnapshot = await db.collection(USERS_COLLECTION).get();
+            document.getElementById('totalUsers').textContent = usersSnapshot.size;
+            
+            // Active Emergencies
+            const activeSnapshot = await db.collection(EMERGENCIES_COLLECTION)
+                .where('status', '==', 'active').get();
+            document.getElementById('activeEmergencies').textContent = activeSnapshot.size;
+            
+            // Total Emergencies
+            const totalSnapshot = await db.collection(EMERGENCIES_COLLECTION).get();
+            document.getElementById('totalEmergencies').textContent = totalSnapshot.size;
+        }
+
+        // Load User Filter
+        async function loadUserFilter() {
+            const usersSnapshot = await db.collection(USERS_COLLECTION).get();
+            const userFilter = document.getElementById('userFilter');
+            
+            usersSnapshot.forEach(doc => {
+                const data = doc.data();
+                const option = document.createElement('option');
+                option.value = data.userId;
+                option.textContent = `${data.firstName} ${data.lastName}`;
+                userFilter.appendChild(option);
+            });
+        }
+
+        // Setup Realtime Listener for emergencies
+        function setupRealtimeListener() {
+            db.collection(EMERGENCIES_COLLECTION)
+                .where('status', '==', 'active')
+                .onSnapshot((snapshot) => {
+                    snapshot.docChanges().forEach((change) => {
+                        if (change.type === 'added') {
+                            // Play notification sound for new emergencies
+                            playNotificationSound();
+                            // Update stats
+                            loadStats();
+                        }
+                    });
+                });
+        }
+
+        // Play notification sound
+        function playNotificationSound() {
+            const audio = new Audio('data:audio/wav;base64,UklGRlwAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YVAAAAA=');
+            audio.play().catch(e => console.log('Audio play failed:', e));
+        }
+
+        // Generate Report
+        document.getElementById('generateReport').addEventListener('click', async () => {
+            const userId = document.getElementById('userFilter').value;
+            const month = document.getElementById('monthFilter').value;
+            
+            let query = db.collection(EMERGENCIES_COLLECTION);
+            
+            if (userId) {
+                query = query.where('userId', '==', userId);
+            }
+            
+            const snapshot = await query.orderBy('timestamp', 'desc').get();
+            
+            const reportDiv = document.getElementById('reportResults');
+            
+            if (snapshot.empty) {
+                reportDiv.innerHTML = '<p style="text-align: center; padding: 20px;">No DIMAX emergency records found.</p>';
+                return;
+            }
+
+            let reportHTML = `
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th>Date & Time</th>
+                            <th>User</th>
+                            <th>Contact</th>
+                            <th>Location</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                const date = data.timestamp ? new Date(data.timestamp.seconds * 1000).toLocaleString('en-PH') : 'Unknown';
+                const statusClass = data.status === 'active' ? 'status-active' : 'status-resolved';
+                
+                reportHTML += `
+                    <tr>
+                        <td>${date}</td>
+                        <td>${data.userName || 'Unknown'}</td>
+                        <td>${data.contactNumber || 'N/A'}</td>
+                        <td>${data.location ? `${data.location.lat}, ${data.location.lng}` : 'N/A'}</td>
+                        <td><span class="status-badge ${statusClass}">${data.status || 'unknown'}</span></td>
+                    </tr>
+                `;
+            });
+            
+            reportHTML += '</tbody></table>';
+            reportDiv.innerHTML = reportHTML;
+        });
+
+        // Reset Filters
+        document.getElementById('resetFilters').addEventListener('click', () => {
+            document.getElementById('userFilter').value = '';
+            document.getElementById('monthFilter').value = '';
+            document.getElementById('reportResults').innerHTML = '';
+        });
+    </script>
+</body>
+</html>
