@@ -16,14 +16,18 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         }
 
+        html, body {
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+        }
+
         body {
             background: #1a1a2e;
-            min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
             padding: 0;
-            margin: 0;
         }
 
         .full-screen {
@@ -38,7 +42,7 @@
             justify-content: center;
             align-items: center;
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            padding: 10px;
+            padding: 16px;
         }
 
         @supports (-webkit-touch-callout: none) {
@@ -48,19 +52,23 @@
         }
 
         .container {
-            max-width: 380px;
+            max-width: 450px;
             width: 100%;
+            height: 95%;
+            max-height: 850px;
             background: white;
-            border-radius: 24px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            border-radius: 32px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
             overflow: hidden;
             animation: slideUp 0.4s ease;
+            display: flex;
+            flex-direction: column;
         }
 
         @keyframes slideUp {
             from {
                 opacity: 0;
-                transform: translateY(15px);
+                transform: translateY(20px);
             }
             to {
                 opacity: 1;
@@ -70,62 +78,78 @@
 
         .landing-header {
             background: linear-gradient(135deg, #ff4d4d 0%, #cc0000 100%);
-            padding: 25px 15px;
+            padding: 30px 20px;
             text-align: center;
             color: white;
+            flex-shrink: 0;
         }
 
         .landing-logo {
-            font-size: 34px;
+            font-size: 42px;
             font-weight: 900;
             display: block;
-            letter-spacing: 1px;
-            margin-bottom: 5px;
+            letter-spacing: 2px;
+            margin-bottom: 8px;
+            text-shadow: 2px 2px 0 rgba(0,0,0,0.2);
         }
 
         .landing-sub {
-            font-size: 14px;
-            opacity: 0.9;
+            font-size: 18px;
+            opacity: 0.95;
             display: block;
-            margin-bottom: 8px;
+            margin-bottom: 12px;
+            font-weight: 500;
         }
 
         .landing-tagline {
-            font-size: 11px;
+            font-size: 14px;
             display: inline-block;
             background: rgba(255,255,255,0.2);
-            padding: 4px 12px;
-            border-radius: 20px;
+            padding: 6px 18px;
+            border-radius: 30px;
+            font-weight: 500;
         }
 
         .content-scroll {
-            padding: 20px 15px;
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px 20px;
             background: white;
+            -webkit-overflow-scrolling: touch;
         }
 
         .footer {
             text-align: center;
-            padding: 12px 15px;
+            padding: 16px 20px;
             background: #f8f9fa;
             color: #666;
-            font-size: 11px;
+            font-size: 13px;
             border-top: 1px solid #e0e0e0;
+            flex-shrink: 0;
+        }
+
+        .footer .company {
+            color: #ff4d4d;
+            font-weight: 600;
         }
 
         .tab-container {
             display: flex;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
             border-bottom: 2px solid #e0e0e0;
+            background: white;
+            padding-top: 5px;
         }
 
         .tab {
             flex: 1;
             text-align: center;
-            padding: 10px;
+            padding: 12px;
             cursor: pointer;
             color: #666;
             font-weight: 600;
-            font-size: 15px;
+            font-size: 17px;
+            transition: all 0.3s ease;
         }
 
         .tab.active {
@@ -143,29 +167,29 @@
 
         .form-container h2 {
             color: #333;
-            margin-bottom: 20px;
-            font-size: 20px;
+            margin-bottom: 25px;
+            font-size: 24px;
             text-align: center;
         }
 
         .form-group {
-            margin-bottom: 15px;
+            margin-bottom: 20px;
         }
 
         .form-group label {
             display: block;
-            margin-bottom: 4px;
+            margin-bottom: 6px;
             color: #555;
             font-weight: 500;
-            font-size: 13px;
+            font-size: 15px;
         }
 
         .form-group input {
             width: 100%;
-            padding: 12px;
+            padding: 15px;
             border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            font-size: 14px;
+            border-radius: 12px;
+            font-size: 16px;
             background: white;
         }
 
@@ -176,88 +200,100 @@
 
         .btn-primary {
             width: 100%;
-            padding: 14px;
+            padding: 16px;
             background: linear-gradient(135deg, #ff4d4d, #cc0000);
             color: white;
             border: none;
-            border-radius: 10px;
-            font-size: 16px;
+            border-radius: 12px;
+            font-size: 18px;
             font-weight: bold;
             cursor: pointer;
             text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 10px;
         }
 
         .btn-primary:active {
             transform: scale(0.98);
         }
 
-        /* SOS Page - Compact */
+        /* SOS Page - Full Screen */
         .sos-page {
             display: none;
-            max-width: 380px;
             width: 100%;
+            height: 100%;
             background: white;
-            border-radius: 24px;
+            border-radius: 32px;
             overflow: hidden;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+            flex-direction: column;
         }
 
         .sos-page.active {
-            display: block;
+            display: flex;
         }
 
         .sos-header {
             background: linear-gradient(135deg, #ff4d4d 0%, #cc0000 100%);
-            padding: 15px;
+            padding: 25px 20px;
             text-align: center;
             color: white;
+            flex-shrink: 0;
         }
 
         .sos-logo {
-            font-size: 24px;
+            font-size: 32px;
             font-weight: 900;
             display: block;
+            letter-spacing: 1px;
         }
 
         .sos-content {
-            padding: 15px;
+            flex: 1;
+            overflow-y: auto;
+            padding: 25px 20px;
             background: white;
+            -webkit-overflow-scrolling: touch;
+            display: flex;
+            flex-direction: column;
         }
 
         .user-info-card {
             background: #f8f9fa;
-            padding: 12px;
-            border-radius: 12px;
-            margin-bottom: 15px;
+            padding: 20px;
+            border-radius: 16px;
+            margin-bottom: 20px;
             text-align: center;
-            border-left: 4px solid #ff4d4d;
+            border-left: 5px solid #ff4d4d;
+            flex-shrink: 0;
         }
 
         .user-name-display {
-            font-size: 20px;
+            font-size: 26px;
             font-weight: bold;
             color: #333;
+            margin-bottom: 8px;
         }
 
         .user-group-display {
             color: #ff4d4d;
             font-weight: 600;
-            font-size: 14px;
-            margin-top: 3px;
+            font-size: 18px;
         }
 
         .sos-button-container {
             display: flex;
             justify-content: center;
-            margin: 10px 0 15px;
+            margin: 15px 0 20px;
+            flex-shrink: 0;
         }
 
         .sos-button {
-            width: 180px;
-            height: 180px;
+            width: 240px;
+            height: 240px;
             border-radius: 50%;
             background: linear-gradient(135deg, #ff4d4d, #cc0000);
-            border: 6px solid #ffb3b3;
+            border: 8px solid #ffb3b3;
             color: white;
             font-weight: bold;
             cursor: pointer;
@@ -265,12 +301,12 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            box-shadow: 0 15px 30px rgba(255,68,68,0.4);
-            transition: all 0.2s ease;
+            box-shadow: 0 20px 40px rgba(255,68,68,0.4);
+            transition: all 0.3s ease;
         }
 
         .sos-button.active {
-            transform: scale(0.92);
+            transform: scale(0.94);
             border-color: #ff4d4d;
             background: linear-gradient(135deg, #b30000, #800000);
             animation: pulse 1.5s infinite;
@@ -278,77 +314,121 @@
 
         @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(255,68,68,0.7); }
-            70% { box-shadow: 0 0 0 15px rgba(255,68,68,0); }
+            70% { box-shadow: 0 0 0 20px rgba(255,68,68,0); }
             100% { box-shadow: 0 0 0 0 rgba(255,68,68,0); }
         }
 
         .sos-text {
-            font-size: 44px;
+            font-size: 60px;
             font-weight: 900;
+            margin-bottom: 5px;
+            text-shadow: 3px 3px 0 rgba(0,0,0,0.2);
         }
 
         .sos-engaged {
-            font-size: 16px;
-            font-weight: 700;
+            font-size: 20px;
+            font-weight: 800;
+            letter-spacing: 1px;
         }
 
         .sos-press-to-stop {
-            font-size: 12px;
-            margin-top: 2px;
+            font-size: 15px;
+            font-weight: 500;
+            margin-top: 4px;
+            opacity: 0.95;
         }
 
         .sos-instruction {
-            font-size: 13px;
+            font-size: 16px;
+            font-weight: 500;
             text-align: center;
-            padding: 0 5px;
+            padding: 0 10px;
+            line-height: 1.4;
         }
 
         .status-message {
-            margin: 10px 0;
-            padding: 10px;
-            border-radius: 8px;
-            font-size: 13px;
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 12px;
+            font-size: 15px;
             text-align: center;
+            font-weight: 500;
+            flex-shrink: 0;
         }
 
-        .success { background: #d4edda; color: #155724; }
-        .error { background: #f8d7da; color: #721c24; }
-        .info { background: #d1ecf1; color: #0c5460; }
+        .success { 
+            background: #d4edda; 
+            color: #155724; 
+            border: 1px solid #c3e6cb;
+        }
+        .error { 
+            background: #f8d7da; 
+            color: #721c24; 
+            border: 1px solid #f5c6cb;
+        }
+        .info { 
+            background: #d1ecf1; 
+            color: #0c5460; 
+            border: 1px solid #bee5eb;
+        }
+
+        .location-note {
+            font-size: 14px;
+            color: #666;
+            text-align: center;
+            margin: 10px 0 15px;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 3px solid #ff4d4d;
+            flex-shrink: 0;
+        }
 
         .emergency-history {
+            flex: 1;
+            overflow-y: auto;
             margin-top: 15px;
+            min-height: 120px;
         }
 
         .emergency-history h3 {
             color: #333;
-            margin-bottom: 10px;
-            font-size: 16px;
+            margin-bottom: 12px;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
 
         .history-item {
             background: #f8f9fa;
-            padding: 10px;
-            border-radius: 8px;
-            margin-bottom: 6px;
+            padding: 14px;
+            border-radius: 12px;
             border-left: 4px solid #ff4d4d;
-            font-size: 12px;
+            font-size: 14px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .history-item small {
             color: #666;
             display: block;
-            margin-top: 4px;
-            font-size: 10px;
+            margin-top: 6px;
+            font-size: 12px;
         }
 
-        .location-note {
-            font-size: 11px;
-            color: #666;
-            text-align: center;
-            margin: 8px 0;
-            padding: 6px;
-            background: #f8f9fa;
-            border-radius: 6px;
+        .hidden {
+            display: none !important;
         }
     </style>
 </head>
@@ -381,7 +461,7 @@
                         </div>
                         <button type="submit" class="btn-primary">Mag-login</button>
                     </form>
-                    <div id="loginMessage" style="margin-top: 10px;"></div>
+                    <div id="loginMessage" style="margin-top: 15px;"></div>
                 </div>
 
                 <div id="registerForm" class="form-container">
@@ -413,17 +493,17 @@
                         </div>
                         <button type="submit" class="btn-primary">Magparehistro</button>
                     </form>
-                    <div id="registerMessage" style="margin-top: 10px;"></div>
+                    <div id="registerMessage" style="margin-top: 15px;"></div>
                 </div>
             </div>
 
             <div class="footer">
                 <span>🚨 DIMAX SOS</span><br>
-                <span>Developed by RP8 & Dimax</span>
+                <span>Developed by <span class="company">RP8 & Dimax</span></span>
             </div>
         </div>
 
-        <!-- SOS Page -->
+        <!-- SOS Page - Full Screen -->
         <div id="sosPage" class="sos-page">
             <div class="sos-header">
                 <span class="sos-logo">DIMAX Emergency</span>
@@ -445,9 +525,9 @@
                 <div id="sosStatus" class="status-message"></div>
                 <div id="locationNote" class="location-note">📍 Ibahagi ang location para sa rescue</div>
                 
-                <div id="emergencyHistory" class="emergency-history">
-                    <h3>📋 Kasaysayan</h3>
-                    <div id="historyList"></div>
+                <div class="emergency-history">
+                    <h3>📋 Kasaysayan ng Emergency</h3>
+                    <div id="historyList" class="history-list"></div>
                 </div>
             </div>
         </div>
@@ -503,6 +583,8 @@
             currentEmergencyId = null;
             sosButton.classList.remove('active');
             document.querySelector('.sos-instruction').innerHTML = 'Pindutin kung may emergency';
+            document.getElementById('sosStatus').innerHTML = '';
+            document.getElementById('locationNote').innerHTML = '📍 Ibahagi ang location para sa rescue';
         }
 
         function showLandingPage() {
@@ -638,17 +720,21 @@
             list.innerHTML = '';
             
             if (snapshot.empty) {
-                list.innerHTML = '<p style="text-align:center;color:#666;">Walang record</p>';
+                list.innerHTML = '<div class="history-item" style="text-align:center;">Walang record ng emergency</div>';
                 return;
             }
             
             snapshot.forEach(doc => {
                 const data = doc.data();
                 const date = data.timestamp ? new Date(data.timestamp.seconds * 1000).toLocaleString() : 'Unknown';
+                const locationText = data.location ? '📍 With location' : '📍 No location';
+                const statusText = data.status === 'active' ? '🟢 Active' : 
+                                 data.status === 'in-progress' ? '🟡 Being Handled' : '✅ Completed';
+                
                 list.innerHTML += `
                     <div class="history-item">
-                        <strong>🚨 Emergency</strong><br>
-                        ${data.location ? '📍 With location' : '📍 No location'}<br>
+                        <strong>🚨 Emergency ${statusText}</strong><br>
+                        ${locationText}<br>
                         <small>📅 ${date}</small>
                     </div>
                 `;
@@ -674,7 +760,7 @@
                 
             } else {
                 // SOS Pressed - Activate immediately
-                statusDiv.innerHTML = '📍 Ina-activate...';
+                statusDiv.innerHTML = '📍 Ina-activate ang SOS...';
                 statusDiv.className = 'status-message info';
                 
                 try {
@@ -702,11 +788,11 @@
                     isSOSActive = true;
                     sosButton.classList.add('active');
                     document.querySelector('.sos-instruction').innerHTML = '<span class="sos-engaged">ENGAGED</span><br><span class="sos-press-to-stop">PRESS TO STOP</span>';
-                    statusDiv.innerHTML = '✅ SOS Sent - Getting location...';
+                    statusDiv.innerHTML = '✅ SOS Sent - Kumukuha ng location...';
+                    locationNote.innerHTML = '📍 Hinihingi ang location...';
 
                     // NOW ask for location - this triggers Safari popup
                     try {
-                        locationNote.innerHTML = '📍 Asking for location...';
                         const position = await requestLocation();
                         
                         currentLocation = {
@@ -718,26 +804,61 @@
                             location: currentLocation
                         });
                         
-                        statusDiv.innerHTML = '✅ SOS Active - Location shared';
-                        locationNote.innerHTML = '📍 Location shared';
+                        statusDiv.innerHTML = '✅ SOS Active - Ibinahagi ang location';
+                        locationNote.innerHTML = '📍 Location shared - Salamat!';
                         startTracking(currentEmergencyId);
                         
                     } catch (locError) {
                         console.log('Location error:', locError);
-                        statusDiv.innerHTML = '✅ SOS Active - No location';
-                        locationNote.innerHTML = '📍 Location not shared';
+                        
+                        if (locError.code === 1) {
+                            locationNote.innerHTML = '📍 Hindi pinayagan ang location';
+                        } else {
+                            locationNote.innerHTML = '📍 Hindi makuha ang location';
+                        }
+                        statusDiv.innerHTML = '✅ SOS Active - Walang location';
                     }
                     
                     loadHistory();
 
                 } catch (error) {
                     console.error('SOS error:', error);
-                    statusDiv.innerHTML = '❌ Failed';
+                    statusDiv.innerHTML = '❌ Nabigo ang SOS';
                     statusDiv.className = 'status-message error';
                     sosButton.classList.remove('active');
                 }
             }
         });
+
+        // Listen for status changes from server
+        if (auth.currentUser) {
+            db.collection(EMERGENCIES_COLLECTION)
+                .where('userId', '==', auth.currentUser?.uid)
+                .where('status', 'in', ['in-progress', 'completed'])
+                .onSnapshot((snapshot) => {
+                    snapshot.docChanges().forEach((change) => {
+                        if (change.type === 'modified') {
+                            const data = change.doc.data();
+                            if (data.status === 'in-progress') {
+                                statusDiv.innerHTML = '🟡 Inaasikaso na ng operator';
+                                statusDiv.className = 'status-message warning';
+                            } else if (data.status === 'completed') {
+                                statusDiv.innerHTML = '✅ Na-resolve na ang emergency';
+                                statusDiv.className = 'status-message success';
+                                
+                                if (change.doc.id === currentEmergencyId) {
+                                    isSOSActive = false;
+                                    currentEmergencyId = null;
+                                    sosButton.classList.remove('active');
+                                    document.querySelector('.sos-instruction').innerHTML = 'Pindutin kung may emergency';
+                                    stopTracking();
+                                }
+                            }
+                            loadHistory();
+                        }
+                    });
+                });
+        }
     </script>
 </body>
 </html>
