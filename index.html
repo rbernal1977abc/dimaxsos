@@ -39,7 +39,7 @@
             align-items: center;
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
             overflow-y: auto;
-            padding: 12px;
+            padding: 10px;
         }
 
         @supports (-webkit-touch-callout: none) {
@@ -49,7 +49,7 @@
         }
 
         .container {
-            max-width: 420px;
+            max-width: 400px;
             width: 100%;
             background: white;
             border-radius: 24px;
@@ -58,7 +58,7 @@
             animation: slideUp 0.4s ease;
             display: flex;
             flex-direction: column;
-            max-height: 95vh;
+            max-height: 98vh;
         }
 
         @keyframes slideUp {
@@ -74,7 +74,7 @@
 
         .landing-header {
             background: linear-gradient(135deg, #ff4d4d 0%, #cc0000 100%);
-            padding: 24px 20px;
+            padding: 20px 15px;
             text-align: center;
             color: white;
             position: relative;
@@ -87,39 +87,39 @@
             position: absolute;
             right: -10px;
             top: -10px;
-            font-size: 90px;
+            font-size: 80px;
             opacity: 0.1;
             transform: rotate(15deg);
         }
 
         .landing-logo {
-            font-size: 34px;
+            font-size: 32px;
             font-weight: 900;
             display: block;
             text-shadow: 2px 2px 0 rgba(0,0,0,0.2);
             letter-spacing: 1px;
-            margin-bottom: 5px;
+            margin-bottom: 3px;
         }
 
         .landing-sub {
-            font-size: 15px;
+            font-size: 14px;
             opacity: 0.9;
             display: block;
             font-style: italic;
-            margin-bottom: 8px;
+            margin-bottom: 5px;
         }
 
         .landing-tagline {
-            font-size: 12px;
+            font-size: 11px;
             opacity: 0.9;
             display: inline-block;
             background: rgba(255,255,255,0.2);
-            padding: 6px 16px;
-            border-radius: 30px;
+            padding: 4px 12px;
+            border-radius: 20px;
         }
 
         .content-scroll {
-            padding: 22px 20px;
+            padding: 20px 15px;
             background: white;
             flex: 1;
             overflow-y: auto;
@@ -128,10 +128,10 @@
 
         .footer {
             text-align: center;
-            padding: 14px 20px;
+            padding: 12px 15px;
             background: #f8f9fa;
             color: #666;
-            font-size: 12px;
+            font-size: 11px;
             border-top: 1px solid #e0e0e0;
             flex-shrink: 0;
         }
@@ -143,7 +143,7 @@
 
         .tab-container {
             display: flex;
-            margin-bottom: 22px;
+            margin-bottom: 20px;
             border-bottom: 2px solid #e0e0e0;
             flex-shrink: 0;
         }
@@ -151,12 +151,12 @@
         .tab {
             flex: 1;
             text-align: center;
-            padding: 12px;
+            padding: 10px;
             cursor: pointer;
             color: #666;
             font-weight: 600;
             transition: all 0.3s ease;
-            font-size: 16px;
+            font-size: 15px;
         }
 
         .tab.active {
@@ -175,29 +175,29 @@
 
         .form-container h2 {
             color: #333;
-            margin-bottom: 22px;
-            font-size: 22px;
+            margin-bottom: 20px;
+            font-size: 20px;
             text-align: center;
         }
 
         .form-group {
-            margin-bottom: 18px;
+            margin-bottom: 15px;
         }
 
         .form-group label {
             display: block;
-            margin-bottom: 5px;
+            margin-bottom: 4px;
             color: #555;
             font-weight: 500;
-            font-size: 14px;
+            font-size: 13px;
         }
 
         .form-group input {
             width: 100%;
-            padding: 14px;
+            padding: 12px;
             border: 2px solid #e0e0e0;
             border-radius: 10px;
-            font-size: 15px;
+            font-size: 14px;
             transition: border 0.3s ease;
             -webkit-appearance: none;
             background: white;
@@ -210,12 +210,12 @@
 
         .btn-primary {
             width: 100%;
-            padding: 15px;
+            padding: 14px;
             background: linear-gradient(135deg, #ff4d4d, #cc0000);
             color: white;
             border: none;
             border-radius: 10px;
-            font-size: 17px;
+            font-size: 16px;
             font-weight: bold;
             cursor: pointer;
             transition: all 0.2s ease;
@@ -232,12 +232,13 @@
         .sos-page {
             display: none;
             width: 100%;
-            max-width: 420px;
+            max-width: 400px;
             background: white;
             border-radius: 24px;
             overflow: hidden;
             box-shadow: 0 20px 40px rgba(0,0,0,0.4);
             flex-direction: column;
+            max-height: 98vh;
         }
 
         .sos-page.active {
@@ -246,57 +247,62 @@
 
         .sos-header {
             background: linear-gradient(135deg, #ff4d4d 0%, #cc0000 100%);
-            padding: 20px;
+            padding: 15px;
             text-align: center;
             color: white;
+            flex-shrink: 0;
         }
 
         .sos-logo {
-            font-size: 28px;
+            font-size: 26px;
             font-weight: 900;
             display: block;
             letter-spacing: 1px;
+            line-height: 1.2;
         }
 
         .sos-content {
-            padding: 30px 20px;
+            padding: 20px 15px;
             background: white;
+            flex: 1;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
         .user-info-card {
             background: #f8f9fa;
-            padding: 20px;
-            border-radius: 16px;
-            margin-bottom: 30px;
+            padding: 15px;
+            border-radius: 14px;
+            margin-bottom: 20px;
             text-align: center;
             border-left: 4px solid #ff4d4d;
         }
 
         .user-name-display {
-            font-size: 24px;
+            font-size: 22px;
             font-weight: bold;
             color: #333;
-            margin-bottom: 8px;
+            margin-bottom: 5px;
         }
 
         .user-group-display {
             color: #ff4d4d;
             font-weight: 600;
-            font-size: 16px;
+            font-size: 15px;
         }
 
         .sos-button-container {
             display: flex;
             justify-content: center;
-            margin: 20px 0 30px;
+            margin: 15px 0 20px;
         }
 
         .sos-button {
-            width: 220px;
-            height: 220px;
+            width: 200px;
+            height: 200px;
             border-radius: 50%;
             background: linear-gradient(135deg, #ff4d4d, #cc0000);
-            border: 8px solid #ffb3b3;
+            border: 6px solid #ffb3b3;
             color: white;
             font-weight: bold;
             cursor: pointer;
@@ -329,7 +335,7 @@
         }
 
         .sos-text {
-            font-size: 52px;
+            font-size: 48px;
             margin-bottom: 2px;
             font-weight: 900;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
@@ -337,33 +343,33 @@
         }
 
         .sos-engaged {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 700;
             letter-spacing: 1px;
             margin: 2px 0;
         }
 
         .sos-press-to-stop {
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 500;
             opacity: 0.9;
             margin-top: 2px;
         }
 
         .sos-instruction {
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 500;
             text-align: center;
-            padding: 0 10px;
-            line-height: 1.4;
+            padding: 0 8px;
+            line-height: 1.3;
         }
 
         .status-message {
-            margin: 20px 0;
-            padding: 16px;
-            border-radius: 12px;
+            margin: 15px 0;
+            padding: 12px;
+            border-radius: 10px;
             font-weight: 500;
-            font-size: 15px;
+            font-size: 14px;
             text-align: center;
         }
 
@@ -392,23 +398,24 @@
         }
 
         .emergency-history {
-            margin-top: 30px;
+            margin-top: 20px;
             text-align: left;
         }
 
         .emergency-history h3 {
             color: #333;
-            margin-bottom: 15px;
-            font-size: 18px;
+            margin-bottom: 12px;
+            font-size: 17px;
         }
 
         .history-item {
             background: #f8f9fa;
-            padding: 14px;
-            border-radius: 12px;
-            margin-bottom: 10px;
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 8px;
             border-left: 4px solid;
             transition: all 0.2s ease;
+            font-size: 13px;
         }
 
         .history-item.active {
@@ -430,17 +437,17 @@
         .history-item small {
             color: #666;
             display: block;
-            margin-top: 6px;
-            font-size: 12px;
+            margin-top: 5px;
+            font-size: 11px;
         }
 
         .history-status {
             display: inline-block;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 10px;
             font-weight: bold;
-            margin-left: 8px;
+            margin-left: 6px;
         }
 
         .status-active {
@@ -462,23 +469,47 @@
             font-size: 12px;
             color: #666;
             text-align: center;
-            margin-top: 10px;
-            padding: 8px;
+            margin: 10px 0;
+            padding: 10px;
             background: #f8f9fa;
             border-radius: 8px;
+            border-left: 3px solid #ffc107;
+        }
+
+        .permission-note.warning {
+            background: #fff3cd;
+            border-left-color: #ff4d4d;
+            color: #856404;
+        }
+
+        .permission-note.success {
+            background: #d4edda;
+            border-left-color: #28a745;
+            color: #155724;
         }
 
         .view-location-btn {
             background: #17a2b8;
             color: white;
             border: none;
-            padding: 8px 16px;
+            padding: 10px;
             border-radius: 8px;
             font-size: 13px;
             font-weight: 500;
             cursor: pointer;
-            margin-top: 8px;
+            margin: 10px 0;
             width: 100%;
+        }
+
+        .ios-settings-note {
+            background: #e7f3ff;
+            border: 1px solid #b8daff;
+            color: #004085;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin: 10px 0;
+            text-align: center;
         }
 
         .hidden {
@@ -583,7 +614,16 @@
                     📍 I-share ang location para sa mas mabilis na rescue
                 </div>
                 
-                <!-- View Location Button (only shows when location is available) -->
+                <!-- iOS Settings Note (shown when location is blocked) -->
+                <div id="iosSettingsNote" class="ios-settings-note hidden">
+                    ⚙️ Location is blocked. To enable:<br>
+                    1. Go to Settings → Safari<br>
+                    2. Tap "Location"<br>
+                    3. Select "While Using"<br>
+                    4. Refresh this page
+                </div>
+                
+                <!-- View Location Button -->
                 <button id="viewLocationBtn" class="view-location-btn hidden" onclick="viewCurrentLocation()">
                     📍 View My Location
                 </button>
@@ -625,6 +665,7 @@
         let currentEmergencyId = null;
         let currentUser = null;
         let currentLocation = null;
+        let locationPermissionState = 'prompt'; // 'prompt', 'granted', 'denied'
 
         // Auth state observer
         auth.onAuthStateChanged(async (user) => {
@@ -634,8 +675,9 @@
                     if (userDoc.exists) {
                         currentUser = userDoc.data();
                         showSOSPage();
-                        checkActiveEmergency(user.uid);
+                        // Don't auto-check for active emergency - always start disengaged
                         loadHistory();
+                        checkLocationPermission();
                     }
                 } catch (error) {
                     console.error('Error loading user:', error);
@@ -645,31 +687,24 @@
             }
         });
 
-        async function checkActiveEmergency(userId) {
-            try {
-                const snapshot = await db.collection(EMERGENCIES_COLLECTION)
-                    .where('userId', '==', userId)
-                    .where('status', 'in', ['active', 'in-progress'])
-                    .limit(1)
-                    .get();
-                
-                if (!snapshot.empty) {
-                    const emergency = snapshot.docs[0];
-                    currentEmergencyId = emergency.id;
-                    isSOSActive = true;
-                    sosButton.classList.add('active');
-                    
-                    // Update button text
-                    updateButtonText(true);
-                    
-                    const status = emergency.data().status;
-                    let statusText = status === 'active' ? 'Active' : 'Being Handled';
-                    document.getElementById('sosStatus').innerHTML = `✅ Emergency ${statusText}`;
-                    document.getElementById('sosStatus').className = 'status-message success';
-                }
-            } catch (error) {
-                console.error('Error checking active emergency:', error);
+        function showSOSPage() {
+            document.getElementById('landingPage').style.display = 'none';
+            document.getElementById('sosPage').classList.add('active');
+            document.getElementById('displayName').textContent = `${currentUser.firstName} ${currentUser.lastName}`;
+            if (currentUser.groupName) {
+                document.getElementById('groupBadge').textContent = `👥 ${currentUser.groupName}`;
             }
+            
+            // Ensure SOS is not active on page load
+            isSOSActive = false;
+            currentEmergencyId = null;
+            sosButton.classList.remove('active');
+            updateButtonText(false);
+        }
+
+        function showLandingPage() {
+            document.getElementById('landingPage').style.display = 'block';
+            document.getElementById('sosPage').classList.remove('active');
         }
 
         function updateButtonText(isActive) {
@@ -679,20 +714,6 @@
             } else {
                 sosInstruction.innerHTML = 'Pindutin kung may emergency';
             }
-        }
-
-        function showSOSPage() {
-            document.getElementById('landingPage').style.display = 'none';
-            document.getElementById('sosPage').classList.add('active');
-            document.getElementById('displayName').textContent = `${currentUser.firstName} ${currentUser.lastName}`;
-            if (currentUser.groupName) {
-                document.getElementById('groupBadge').textContent = `👥 ${currentUser.groupName}`;
-            }
-        }
-
-        function showLandingPage() {
-            document.getElementById('landingPage').style.display = 'block';
-            document.getElementById('sosPage').classList.remove('active');
         }
 
         window.switchTab = function(tab) {
@@ -732,7 +753,6 @@
             const regCode = document.getElementById('regCode').value;
 
             try {
-                // Check code
                 const codeSnapshot = await db.collection(CODES_COLLECTION)
                     .where('code', '==', regCode)
                     .where('used', '==', false)
@@ -745,14 +765,11 @@
 
                 const codeData = codeSnapshot.docs[0].data();
                 
-                // Get group
                 const groupDoc = await db.collection(GROUPS_COLLECTION).doc(codeData.groupId).get();
                 const groupName = groupDoc.exists ? groupDoc.data().name : 'Unknown';
 
-                // Create user
                 const userCred = await auth.createUserWithEmailAndPassword(email, password);
                 
-                // Save user data
                 await db.collection(USERS_COLLECTION).doc(userCred.user.uid).set({
                     userId: userCred.user.uid,
                     firstName: firstName,
@@ -764,7 +781,6 @@
                     registeredAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
 
-                // Mark code as used
                 await codeSnapshot.docs[0].ref.update({
                     used: true,
                     usedBy: userCred.user.uid
@@ -775,7 +791,37 @@
             }
         });
 
-        // Get location - THIS triggers browser popup every time
+        // Check location permission
+        function checkLocationPermission() {
+            if (!navigator.geolocation) {
+                showPermissionNote('Geolocation not supported', 'warning');
+                return;
+            }
+            
+            if (navigator.permissions) {
+                navigator.permissions.query({ name: 'geolocation' }).then(result => {
+                    locationPermissionState = result.state;
+                    
+                    if (result.state === 'granted') {
+                        showPermissionNote('📍 Location access granted', 'success');
+                    } else if (result.state === 'prompt') {
+                        showPermissionNote('📍 Ibahagi ang location para sa rescue', 'info');
+                    } else if (result.state === 'denied') {
+                        locationPermissionState = 'denied';
+                        showPermissionNote('⚠️ Location blocked. Enable in Settings → Safari → Location', 'warning');
+                        document.getElementById('iosSettingsNote').classList.remove('hidden');
+                    }
+                });
+            }
+        }
+
+        function showPermissionNote(message, type) {
+            const note = document.getElementById('permissionNote');
+            note.textContent = message;
+            note.className = 'permission-note ' + type;
+        }
+
+        // Request location - handles iOS "Never" setting
         function requestLocation() {
             return new Promise((resolve, reject) => {
                 if (!navigator.geolocation) {
@@ -783,19 +829,44 @@
                     return;
                 }
                 
-                // This will trigger the browser's permission popup EVERY TIME
-                // For iOS Safari, we need to ensure it's called from a user gesture
-                navigator.geolocation.getCurrentPosition(resolve, reject, {
-                    enableHighAccuracy: true,
-                    timeout: 30000,
-                    maximumAge: 0
-                });
+                // Check if permission is denied
+                if (locationPermissionState === 'denied') {
+                    // Show iOS settings instructions
+                    document.getElementById('iosSettingsNote').classList.remove('hidden');
+                    reject(new Error('Location blocked in settings'));
+                    return;
+                }
+                
+                // For iOS, we need to ensure this is called from a user gesture
+                // and with the right options
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        locationPermissionState = 'granted';
+                        document.getElementById('iosSettingsNote').classList.add('hidden');
+                        resolve(position);
+                    },
+                    (error) => {
+                        console.log('Location error:', error);
+                        
+                        if (error.code === 1) { // PERMISSION_DENIED
+                            locationPermissionState = 'denied';
+                            document.getElementById('iosSettingsNote').classList.remove('hidden');
+                        }
+                        reject(error);
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 30000,
+                        maximumAge: 0
+                    }
+                );
             });
         }
 
         // Start tracking
         function startTracking(emergencyId) {
             if (!navigator.geolocation) return;
+            if (locationPermissionState !== 'granted') return;
             
             watchId = navigator.geolocation.watchPosition(
                 async (position) => {
@@ -811,7 +882,6 @@
                                 lastUpdate: firebase.firestore.FieldValue.serverTimestamp()
                             });
                             
-                            // Show view location button
                             document.getElementById('viewLocationBtn').classList.remove('hidden');
                         } catch (error) {
                             console.error('Update error:', error);
@@ -907,7 +977,7 @@
 
         sosButton.addEventListener('click', async () => {
             if (isSOSActive) {
-                // User pressed STOP - just stop tracking but DON'T change status
+                // User pressed STOP - stop tracking but DON'T change status
                 stopTracking();
                 
                 isSOSActive = false;
@@ -917,8 +987,10 @@
                 // Reset button text
                 updateButtonText(false);
                 
-                statusDiv.innerHTML = '✅ Tracking stopped - Emergency remains active';
+                statusDiv.innerHTML = '✅ Tracking stopped';
                 statusDiv.className = 'status-message info';
+                
+                document.getElementById('viewLocationBtn').classList.add('hidden');
                 
             } else {
                 // Activate - send SOS immediately
@@ -929,11 +1001,10 @@
                     const user = auth.currentUser;
                     if (!user) throw new Error('Not logged in');
 
-                    // Get user data
                     const userDoc = await db.collection(USERS_COLLECTION).doc(user.uid).get();
                     const userData = userDoc.data();
 
-                    // Create emergency WITHOUT location first - this goes to server immediately
+                    // Create emergency
                     const emergencyData = {
                         userId: user.uid,
                         userName: `${userData.firstName} ${userData.lastName}`,
@@ -941,28 +1012,24 @@
                         groupId: userData.groupId,
                         groupName: userData.groupName,
                         timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                        status: 'active', // Always starts as active
+                        status: 'active',
                         createdAt: new Date().toISOString()
                     };
 
-                    // Save to Firestore - SOS is sent!
                     const docRef = await db.collection(EMERGENCIES_COLLECTION).add(emergencyData);
                     currentEmergencyId = docRef.id;
 
-                    // Update UI immediately
+                    // Update UI
                     isSOSActive = true;
                     sosButton.classList.add('active');
-                    
-                    // Update button text
                     updateButtonText(true);
                     
                     statusDiv.innerHTML = '✅ SOS sent - Binabasa ang lokasyon...';
 
-                    // Try to get location - THIS triggers browser popup EVERY TIME
+                    // Try to get location - this will trigger browser popup
                     try {
                         permissionNote.innerHTML = '📍 Hinihingi ang permission para sa location...';
                         
-                        // This will trigger the browser's permission popup
                         const position = await requestLocation();
                         
                         currentLocation = {
@@ -970,38 +1037,31 @@
                             lng: position.coords.longitude
                         };
                         
-                        // Update with location
                         await db.collection(EMERGENCIES_COLLECTION).doc(currentEmergencyId).update({
                             location: currentLocation,
                             hasLocation: true
                         });
                         
                         statusDiv.innerHTML = '✅ SOS active - Location shared';
-                        permissionNote.innerHTML = '📍 Location shared - Salamat!';
+                        showPermissionNote('📍 Location shared - Salamat!', 'success');
                         
-                        // Show view location button
                         document.getElementById('viewLocationBtn').classList.remove('hidden');
+                        document.getElementById('iosSettingsNote').classList.add('hidden');
                         
-                        // Start tracking
                         startTracking(currentEmergencyId);
                         
                     } catch (locError) {
-                        console.log('Location not available:', locError);
+                        console.log('Location error:', locError);
                         
                         if (locError.code === 1) {
-                            // Permission denied
-                            permissionNote.innerHTML = '📍 Location denied - SOS sent without location';
+                            showPermissionNote('⚠️ Location denied. Enable in Settings if needed.', 'warning');
+                            document.getElementById('iosSettingsNote').classList.remove('hidden');
                         } else if (locError.code === 2) {
-                            // Position unavailable
-                            permissionNote.innerHTML = '📍 Location unavailable - SOS sent without location';
+                            showPermissionNote('📍 Location unavailable', 'warning');
                         } else if (locError.code === 3) {
-                            // Timeout
-                            permissionNote.innerHTML = '📍 Location timeout - SOS sent without location';
-                        } else {
-                            permissionNote.innerHTML = '📍 Location not shared - SOS still active';
+                            showPermissionNote('📍 Location timeout', 'warning');
                         }
                         
-                        // SOS still active even without location
                         statusDiv.innerHTML = '✅ SOS active - No location';
                     }
                     
@@ -1012,27 +1072,12 @@
                     statusDiv.innerHTML = '❌ Failed: ' + error.message;
                     statusDiv.className = 'status-message error';
                     sosButton.classList.remove('active');
-                    
-                    // Reset button text
                     updateButtonText(false);
                 }
             }
         });
 
-        // Check location permission on page load
-        if (navigator.permissions) {
-            navigator.permissions.query({ name: 'geolocation' }).then(result => {
-                if (result.state === 'granted') {
-                    permissionNote.innerHTML = '📍 Location access granted';
-                } else if (result.state === 'prompt') {
-                    permissionNote.innerHTML = '📍 Ibahagi ang location para sa rescue';
-                } else if (result.state === 'denied') {
-                    permissionNote.innerHTML = '📍 Location blocked - Enable sa settings';
-                }
-            });
-        }
-
-        // Listen for status changes from server
+        // Listen for status changes
         if (auth.currentUser) {
             db.collection(EMERGENCIES_COLLECTION)
                 .where('userId', '==', auth.currentUser?.uid)
@@ -1042,13 +1087,12 @@
                         if (change.type === 'modified') {
                             const data = change.doc.data();
                             if (data.status === 'in-progress') {
-                                statusDiv.innerHTML = '🟡 Emergency is now being handled by operator';
+                                statusDiv.innerHTML = '🟡 Emergency is now being handled';
                                 statusDiv.className = 'status-message warning';
                             } else if (data.status === 'completed') {
-                                statusDiv.innerHTML = '✅ Emergency has been resolved';
+                                statusDiv.innerHTML = '✅ Emergency resolved';
                                 statusDiv.className = 'status-message success';
                                 
-                                // If current emergency is completed, reset button
                                 if (change.doc.id === currentEmergencyId) {
                                     isSOSActive = false;
                                     currentEmergencyId = null;
