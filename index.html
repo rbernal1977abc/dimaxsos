@@ -20,6 +20,7 @@
             height: 100%;
             width: 100%;
             overflow: hidden;
+            position: fixed;
         }
 
         body {
@@ -27,7 +28,6 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 0;
         }
 
         .full-screen {
@@ -42,7 +42,7 @@
             justify-content: center;
             align-items: center;
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            padding: 16px;
+            padding: 12px;
         }
 
         @supports (-webkit-touch-callout: none) {
@@ -51,14 +51,15 @@
             }
         }
 
+        /* Landing Page Container - Scrollable */
         .container {
-            max-width: 450px;
+            max-width: 400px;
             width: 100%;
             height: 95%;
-            max-height: 850px;
+            max-height: 700px;
             background: white;
-            border-radius: 32px;
-            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+            border-radius: 28px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
             overflow: hidden;
             animation: slideUp 0.4s ease;
             display: flex;
@@ -68,7 +69,7 @@
         @keyframes slideUp {
             from {
                 opacity: 0;
-                transform: translateY(20px);
+                transform: translateY(15px);
             }
             to {
                 opacity: 1;
@@ -78,67 +79,40 @@
 
         .landing-header {
             background: linear-gradient(135deg, #ff4d4d 0%, #cc0000 100%);
-            padding: 30px 20px;
+            padding: 20px 15px;
             text-align: center;
             color: white;
             flex-shrink: 0;
         }
 
         .landing-logo {
-            font-size: 42px;
+            font-size: 32px;
             font-weight: 900;
             display: block;
-            letter-spacing: 2px;
-            margin-bottom: 8px;
-            text-shadow: 2px 2px 0 rgba(0,0,0,0.2);
+            letter-spacing: 1px;
+            margin-bottom: 4px;
         }
 
         .landing-sub {
-            font-size: 18px;
+            font-size: 14px;
             opacity: 0.95;
             display: block;
-            margin-bottom: 12px;
-            font-weight: 500;
+            margin-bottom: 6px;
         }
 
         .landing-tagline {
-            font-size: 14px;
+            font-size: 11px;
             display: inline-block;
             background: rgba(255,255,255,0.2);
-            padding: 6px 18px;
-            border-radius: 30px;
-            font-weight: 500;
-        }
-
-        .content-scroll {
-            flex: 1;
-            overflow-y: auto;
-            padding: 24px 20px;
-            background: white;
-            -webkit-overflow-scrolling: touch;
-        }
-
-        .footer {
-            text-align: center;
-            padding: 16px 20px;
-            background: #f8f9fa;
-            color: #666;
-            font-size: 13px;
-            border-top: 1px solid #e0e0e0;
-            flex-shrink: 0;
-        }
-
-        .footer .company {
-            color: #ff4d4d;
-            font-weight: 600;
+            padding: 4px 12px;
+            border-radius: 20px;
         }
 
         .tab-container {
             display: flex;
-            margin-bottom: 25px;
             border-bottom: 2px solid #e0e0e0;
             background: white;
-            padding-top: 5px;
+            flex-shrink: 0;
         }
 
         .tab {
@@ -148,13 +122,21 @@
             cursor: pointer;
             color: #666;
             font-weight: 600;
-            font-size: 17px;
-            transition: all 0.3s ease;
+            font-size: 15px;
         }
 
         .tab.active {
             color: #ff4d4d;
             border-bottom: 3px solid #ff4d4d;
+        }
+
+        /* Scrollable content area for registration */
+        .content-scroll {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 15px;
+            background: white;
+            -webkit-overflow-scrolling: touch;
         }
 
         .form-container {
@@ -167,29 +149,29 @@
 
         .form-container h2 {
             color: #333;
-            margin-bottom: 25px;
-            font-size: 24px;
+            margin-bottom: 20px;
+            font-size: 22px;
             text-align: center;
         }
 
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
 
         .form-group label {
             display: block;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
             color: #555;
             font-weight: 500;
-            font-size: 15px;
+            font-size: 13px;
         }
 
         .form-group input {
             width: 100%;
-            padding: 15px;
+            padding: 12px;
             border: 2px solid #e0e0e0;
-            border-radius: 12px;
-            font-size: 16px;
+            border-radius: 10px;
+            font-size: 14px;
             background: white;
         }
 
@@ -200,32 +182,42 @@
 
         .btn-primary {
             width: 100%;
-            padding: 16px;
+            padding: 14px;
             background: linear-gradient(135deg, #ff4d4d, #cc0000);
             color: white;
             border: none;
-            border-radius: 12px;
-            font-size: 18px;
+            border-radius: 10px;
+            font-size: 16px;
             font-weight: bold;
             cursor: pointer;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-top: 10px;
+            margin-top: 5px;
         }
 
         .btn-primary:active {
             transform: scale(0.98);
         }
 
-        /* SOS Page - Full Screen */
+        .footer {
+            text-align: center;
+            padding: 12px 15px;
+            background: #f8f9fa;
+            color: #666;
+            font-size: 11px;
+            border-top: 1px solid #e0e0e0;
+            flex-shrink: 0;
+        }
+
+        /* SOS Page - NO SCROLL, everything fits perfectly */
         .sos-page {
             display: none;
+            max-width: 400px;
             width: 100%;
-            height: 100%;
+            height: 95%;
+            max-height: 700px;
             background: white;
-            border-radius: 32px;
+            border-radius: 28px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
             overflow: hidden;
-            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
             flex-direction: column;
         }
 
@@ -235,14 +227,14 @@
 
         .sos-header {
             background: linear-gradient(135deg, #ff4d4d 0%, #cc0000 100%);
-            padding: 25px 20px;
+            padding: 16px 15px;
             text-align: center;
             color: white;
             flex-shrink: 0;
         }
 
         .sos-logo {
-            font-size: 32px;
+            font-size: 24px;
             font-weight: 900;
             display: block;
             letter-spacing: 1px;
@@ -250,50 +242,49 @@
 
         .sos-content {
             flex: 1;
-            overflow-y: auto;
-            padding: 25px 20px;
-            background: white;
-            -webkit-overflow-scrolling: touch;
             display: flex;
             flex-direction: column;
+            padding: 15px 15px 10px 15px;
+            background: white;
+            justify-content: space-between;
+            height: 100%;
         }
 
         .user-info-card {
             background: #f8f9fa;
-            padding: 20px;
-            border-radius: 16px;
-            margin-bottom: 20px;
+            padding: 12px;
+            border-radius: 14px;
             text-align: center;
-            border-left: 5px solid #ff4d4d;
+            border-left: 4px solid #ff4d4d;
             flex-shrink: 0;
         }
 
         .user-name-display {
-            font-size: 26px;
+            font-size: 20px;
             font-weight: bold;
             color: #333;
-            margin-bottom: 8px;
+            margin-bottom: 3px;
         }
 
         .user-group-display {
             color: #ff4d4d;
             font-weight: 600;
-            font-size: 18px;
+            font-size: 14px;
         }
 
         .sos-button-container {
             display: flex;
             justify-content: center;
-            margin: 15px 0 20px;
+            margin: 8px 0;
             flex-shrink: 0;
         }
 
         .sos-button {
-            width: 240px;
-            height: 240px;
+            width: 180px;
+            height: 180px;
             border-radius: 50%;
             background: linear-gradient(135deg, #ff4d4d, #cc0000);
-            border: 8px solid #ffb3b3;
+            border: 6px solid #ffb3b3;
             color: white;
             font-weight: bold;
             cursor: pointer;
@@ -301,8 +292,8 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            box-shadow: 0 20px 40px rgba(255,68,68,0.4);
-            transition: all 0.3s ease;
+            box-shadow: 0 15px 30px rgba(255,68,68,0.4);
+            transition: all 0.2s ease;
         }
 
         .sos-button.active {
@@ -314,117 +305,103 @@
 
         @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(255,68,68,0.7); }
-            70% { box-shadow: 0 0 0 20px rgba(255,68,68,0); }
+            70% { box-shadow: 0 0 0 15px rgba(255,68,68,0); }
             100% { box-shadow: 0 0 0 0 rgba(255,68,68,0); }
         }
 
         .sos-text {
-            font-size: 60px;
+            font-size: 42px;
             font-weight: 900;
-            margin-bottom: 5px;
-            text-shadow: 3px 3px 0 rgba(0,0,0,0.2);
+            margin-bottom: 2px;
         }
 
         .sos-engaged {
-            font-size: 20px;
+            font-size: 15px;
             font-weight: 800;
-            letter-spacing: 1px;
         }
 
         .sos-press-to-stop {
-            font-size: 15px;
+            font-size: 11px;
             font-weight: 500;
-            margin-top: 4px;
-            opacity: 0.95;
+            margin-top: 2px;
         }
 
         .sos-instruction {
-            font-size: 16px;
+            font-size: 12px;
             font-weight: 500;
             text-align: center;
-            padding: 0 10px;
-            line-height: 1.4;
+            padding: 0 5px;
+            line-height: 1.3;
         }
 
         .status-message {
-            margin: 15px 0;
-            padding: 15px;
-            border-radius: 12px;
-            font-size: 15px;
+            margin: 8px 0;
+            padding: 8px;
+            border-radius: 8px;
+            font-size: 12px;
             text-align: center;
             font-weight: 500;
             flex-shrink: 0;
         }
 
-        .success { 
-            background: #d4edda; 
-            color: #155724; 
-            border: 1px solid #c3e6cb;
-        }
-        .error { 
-            background: #f8d7da; 
-            color: #721c24; 
-            border: 1px solid #f5c6cb;
-        }
-        .info { 
-            background: #d1ecf1; 
-            color: #0c5460; 
-            border: 1px solid #bee5eb;
-        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
 
         .location-note {
-            font-size: 14px;
+            font-size: 11px;
             color: #666;
             text-align: center;
-            margin: 10px 0 15px;
-            padding: 12px;
+            margin: 5px 0 8px;
+            padding: 6px;
             background: #f8f9fa;
-            border-radius: 10px;
+            border-radius: 6px;
             border-left: 3px solid #ff4d4d;
             flex-shrink: 0;
         }
 
         .emergency-history {
             flex: 1;
-            overflow-y: auto;
-            margin-top: 15px;
-            min-height: 120px;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            margin-top: 5px;
         }
 
         .emergency-history h3 {
             color: #333;
-            margin-bottom: 12px;
-            font-size: 18px;
+            margin-bottom: 6px;
+            font-size: 14px;
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 4px;
+            flex-shrink: 0;
         }
 
         .history-list {
+            flex: 1;
+            overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 5px;
+            padding-right: 2px;
         }
 
         .history-item {
             background: #f8f9fa;
-            padding: 14px;
-            border-radius: 12px;
+            padding: 8px 10px;
+            border-radius: 8px;
             border-left: 4px solid #ff4d4d;
-            font-size: 14px;
-            animation: fadeIn 0.3s ease;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-5px); }
-            to { opacity: 1; transform: translateY(0); }
+            font-size: 11px;
+            line-height: 1.3;
+            flex-shrink: 0;
         }
 
         .history-item small {
             color: #666;
             display: block;
-            margin-top: 6px;
-            font-size: 12px;
+            margin-top: 3px;
+            font-size: 9px;
         }
 
         .hidden {
@@ -434,7 +411,7 @@
 </head>
 <body>
     <div class="full-screen">
-        <!-- Landing Page -->
+        <!-- Landing Page - Scrollable -->
         <div id="landingPage" class="container">
             <div class="landing-header">
                 <span class="landing-logo">DIMAX SOS</span>
@@ -461,7 +438,7 @@
                         </div>
                         <button type="submit" class="btn-primary">Mag-login</button>
                     </form>
-                    <div id="loginMessage" style="margin-top: 15px;"></div>
+                    <div id="loginMessage" style="margin-top: 10px;"></div>
                 </div>
 
                 <div id="registerForm" class="form-container">
@@ -493,7 +470,7 @@
                         </div>
                         <button type="submit" class="btn-primary">Magparehistro</button>
                     </form>
-                    <div id="registerMessage" style="margin-top: 15px;"></div>
+                    <div id="registerMessage" style="margin-top: 10px;"></div>
                 </div>
             </div>
 
@@ -503,7 +480,7 @@
             </div>
         </div>
 
-        <!-- SOS Page - Full Screen -->
+        <!-- SOS Page - NO SCROLL, everything fits -->
         <div id="sosPage" class="sos-page">
             <div class="sos-header">
                 <span class="sos-logo">DIMAX Emergency</span>
@@ -526,7 +503,7 @@
                 <div id="locationNote" class="location-note">📍 Ibahagi ang location para sa rescue</div>
                 
                 <div class="emergency-history">
-                    <h3>📋 Kasaysayan ng Emergency</h3>
+                    <h3>📋 Kasaysayan</h3>
                     <div id="historyList" class="history-list"></div>
                 </div>
             </div>
@@ -556,7 +533,6 @@
         let watchId = null;
         let currentEmergencyId = null;
         let currentUser = null;
-        let currentLocation = null;
 
         auth.onAuthStateChanged(async (user) => {
             if (user) {
@@ -578,13 +554,17 @@
             if (currentUser.groupName) {
                 document.getElementById('groupBadge').textContent = `👥 ${currentUser.groupName}`;
             }
-            // Ensure SOS starts disengaged
+            resetSOSButton();
+        }
+
+        function resetSOSButton() {
             isSOSActive = false;
             currentEmergencyId = null;
             sosButton.classList.remove('active');
             document.querySelector('.sos-instruction').innerHTML = 'Pindutin kung may emergency';
             document.getElementById('sosStatus').innerHTML = '';
             document.getElementById('locationNote').innerHTML = '📍 Ibahagi ang location para sa rescue';
+            stopTracking();
         }
 
         function showLandingPage() {
@@ -660,15 +640,13 @@
             }
         });
 
-        // Simple location request - this triggers Safari popup
+        // Location request - triggers Safari popup
         function requestLocation() {
             return new Promise((resolve, reject) => {
                 if (!navigator.geolocation) {
                     reject(new Error('Geolocation not supported'));
                     return;
                 }
-                
-                // This simple call triggers the browser's native permission popup
                 navigator.geolocation.getCurrentPosition(resolve, reject, {
                     enableHighAccuracy: true,
                     timeout: 30000,
@@ -683,19 +661,17 @@
             
             watchId = navigator.geolocation.watchPosition(
                 async (position) => {
-                    currentLocation = {
-                        lat: position.coords.latitude,
-                        lng: position.coords.longitude
-                    };
-                    
                     if (emergencyId) {
                         await db.collection(EMERGENCIES_COLLECTION).doc(emergencyId).update({
-                            location: currentLocation,
+                            location: {
+                                lat: position.coords.latitude,
+                                lng: position.coords.longitude
+                            },
                             lastUpdate: firebase.firestore.FieldValue.serverTimestamp()
                         });
                     }
                 },
-                (error) => console.log('Watch error:', error),
+                () => {},
                 { enableHighAccuracy: true }
             );
         }
@@ -713,28 +689,24 @@
             const snapshot = await db.collection(EMERGENCIES_COLLECTION)
                 .where('userId', '==', auth.currentUser.uid)
                 .orderBy('timestamp', 'desc')
-                .limit(5)
+                .limit(3)
                 .get();
             
             const list = document.getElementById('historyList');
             list.innerHTML = '';
             
             if (snapshot.empty) {
-                list.innerHTML = '<div class="history-item" style="text-align:center;">Walang record ng emergency</div>';
+                list.innerHTML = '<div class="history-item">Walang record ng emergency</div>';
                 return;
             }
             
             snapshot.forEach(doc => {
                 const data = doc.data();
                 const date = data.timestamp ? new Date(data.timestamp.seconds * 1000).toLocaleString() : 'Unknown';
-                const locationText = data.location ? '📍 With location' : '📍 No location';
-                const statusText = data.status === 'active' ? '🟢 Active' : 
-                                 data.status === 'in-progress' ? '🟡 Being Handled' : '✅ Completed';
-                
+                const locationText = data.location ? '📍 May location' : '📍 Walang location';
                 list.innerHTML += `
                     <div class="history-item">
-                        <strong>🚨 Emergency ${statusText}</strong><br>
-                        ${locationText}<br>
+                        <strong>🚨 Emergency</strong> ${locationText}<br>
                         <small>📅 ${date}</small>
                     </div>
                 `;
@@ -750,17 +722,13 @@
             if (isSOSActive) {
                 // STOP Pressed
                 stopTracking();
-                isSOSActive = false;
-                currentEmergencyId = null;
-                sosButton.classList.remove('active');
-                document.querySelector('.sos-instruction').innerHTML = 'Pindutin kung may emergency';
+                resetSOSButton();
                 statusDiv.innerHTML = '✅ Tracking stopped';
                 statusDiv.className = 'status-message info';
-                locationNote.innerHTML = '📍 Ibahagi ang location para sa rescue';
                 
             } else {
-                // SOS Pressed - Activate immediately
-                statusDiv.innerHTML = '📍 Ina-activate ang SOS...';
+                // SOS Pressed
+                statusDiv.innerHTML = '📍 Ina-activate...';
                 statusDiv.className = 'status-message info';
                 
                 try {
@@ -770,7 +738,7 @@
                     const userDoc = await db.collection(USERS_COLLECTION).doc(user.uid).get();
                     const userData = userDoc.data();
 
-                    // Send SOS immediately without location
+                    // Send SOS immediately
                     const emergencyData = {
                         userId: user.uid,
                         userName: `${userData.firstName} ${userData.lastName}`,
@@ -791,74 +759,35 @@
                     statusDiv.innerHTML = '✅ SOS Sent - Kumukuha ng location...';
                     locationNote.innerHTML = '📍 Hinihingi ang location...';
 
-                    // NOW ask for location - this triggers Safari popup
+                    // Ask for location - Safari popup
                     try {
                         const position = await requestLocation();
                         
-                        currentLocation = {
-                            lat: position.coords.latitude,
-                            lng: position.coords.longitude
-                        };
-                        
                         await db.collection(EMERGENCIES_COLLECTION).doc(currentEmergencyId).update({
-                            location: currentLocation
+                            location: {
+                                lat: position.coords.latitude,
+                                lng: position.coords.longitude
+                            }
                         });
                         
                         statusDiv.innerHTML = '✅ SOS Active - Ibinahagi ang location';
-                        locationNote.innerHTML = '📍 Location shared - Salamat!';
+                        locationNote.innerHTML = '📍 Location shared';
                         startTracking(currentEmergencyId);
                         
                     } catch (locError) {
-                        console.log('Location error:', locError);
-                        
-                        if (locError.code === 1) {
-                            locationNote.innerHTML = '📍 Hindi pinayagan ang location';
-                        } else {
-                            locationNote.innerHTML = '📍 Hindi makuha ang location';
-                        }
+                        locationNote.innerHTML = '📍 Hindi nakuha ang location';
                         statusDiv.innerHTML = '✅ SOS Active - Walang location';
                     }
                     
                     loadHistory();
 
                 } catch (error) {
-                    console.error('SOS error:', error);
                     statusDiv.innerHTML = '❌ Nabigo ang SOS';
                     statusDiv.className = 'status-message error';
-                    sosButton.classList.remove('active');
+                    resetSOSButton();
                 }
             }
         });
-
-        // Listen for status changes from server
-        if (auth.currentUser) {
-            db.collection(EMERGENCIES_COLLECTION)
-                .where('userId', '==', auth.currentUser?.uid)
-                .where('status', 'in', ['in-progress', 'completed'])
-                .onSnapshot((snapshot) => {
-                    snapshot.docChanges().forEach((change) => {
-                        if (change.type === 'modified') {
-                            const data = change.doc.data();
-                            if (data.status === 'in-progress') {
-                                statusDiv.innerHTML = '🟡 Inaasikaso na ng operator';
-                                statusDiv.className = 'status-message warning';
-                            } else if (data.status === 'completed') {
-                                statusDiv.innerHTML = '✅ Na-resolve na ang emergency';
-                                statusDiv.className = 'status-message success';
-                                
-                                if (change.doc.id === currentEmergencyId) {
-                                    isSOSActive = false;
-                                    currentEmergencyId = null;
-                                    sosButton.classList.remove('active');
-                                    document.querySelector('.sos-instruction').innerHTML = 'Pindutin kung may emergency';
-                                    stopTracking();
-                                }
-                            }
-                            loadHistory();
-                        }
-                    });
-                });
-        }
     </script>
 </body>
 </html>
