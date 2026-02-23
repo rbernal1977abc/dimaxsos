@@ -2,44 +2,72 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
     <title>DIMAX SOS - Emergency Response</title>
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
     <style>
-        /* Keep all your existing styles exactly the same */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         }
 
         body {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            background: #1a1a2e;
             min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 20px;
+            padding: 0;
+            margin: 0;
         }
 
+        /* Full screen container */
+        .full-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            overflow-y: auto;
+            padding: 12px;
+        }
+
+        /* Safari height fix */
+        @supports (-webkit-touch-callout: none) {
+            .full-screen {
+                height: -webkit-fill-available;
+            }
+        }
+
+        /* Landing Page Container */
         .container {
-            max-width: 400px;
+            max-width: 420px;
             width: 100%;
             background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
             overflow: hidden;
-            animation: slideUp 0.5s ease;
+            animation: slideUp 0.4s ease;
+            display: flex;
+            flex-direction: column;
+            max-height: 95vh;
         }
 
         @keyframes slideUp {
             from {
                 opacity: 0;
-                transform: translateY(20px);
+                transform: translateY(15px);
             }
             to {
                 opacity: 1;
@@ -47,113 +75,91 @@
             }
         }
 
-        .header {
+        .landing-header {
             background: linear-gradient(135deg, #ff4d4d 0%, #cc0000 100%);
-            padding: 30px 20px;
+            padding: 24px 20px;
             text-align: center;
             color: white;
             position: relative;
             overflow: hidden;
+            flex-shrink: 0;
         }
 
-        .header::before {
+        .landing-header::before {
             content: "🚨";
             position: absolute;
-            right: -20px;
-            top: -20px;
-            font-size: 100px;
+            right: -10px;
+            top: -10px;
+            font-size: 90px;
             opacity: 0.1;
             transform: rotate(15deg);
         }
 
-        .logo-text {
-            font-size: 36px;
+        .landing-logo {
+            font-size: 34px;
             font-weight: 900;
             display: block;
-            text-shadow: 3px 3px 0 rgba(0,0,0,0.2);
-            letter-spacing: 2px;
+            text-shadow: 2px 2px 0 rgba(0,0,0,0.2);
+            letter-spacing: 1px;
+            margin-bottom: 5px;
         }
 
-        .logo-sub {
-            font-size: 14px;
+        .landing-sub {
+            font-size: 15px;
             opacity: 0.9;
-            margin-top: 5px;
             display: block;
             font-style: italic;
+            margin-bottom: 8px;
         }
 
-        .tagline {
+        .landing-tagline {
             font-size: 12px;
-            opacity: 0.8;
-            margin-top: 10px;
-            display: block;
+            opacity: 0.9;
+            display: inline-block;
             background: rgba(255,255,255,0.2);
-            padding: 5px 15px;
-            border-radius: 20px;
+            padding: 6px 16px;
+            border-radius: 30px;
         }
 
-        .content {
-            padding: 30px 20px;
-        }
-
-        .quick-access {
-            background: #fff3cd;
-            border-left: 4px solid #ff4d4d;
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            display: none;
-        }
-
-        .quick-access .user-email {
-            font-weight: bold;
-            color: #ff4d4d;
-        }
-
-        .quick-access-buttons {
-            display: flex;
-            gap: 10px;
-            margin-top: 10px;
-        }
-
-        .btn-quick {
+        .content-scroll {
+            padding: 22px 20px;
+            background: white;
             flex: 1;
-            padding: 10px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: transform 0.2s;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
-        .btn-quick:hover {
-            transform: translateY(-2px);
+        .footer {
+            text-align: center;
+            padding: 14px 20px;
+            background: #f8f9fa;
+            color: #666;
+            font-size: 12px;
+            border-top: 1px solid #e0e0e0;
+            flex-shrink: 0;
         }
 
-        .btn-quick.login {
-            background: #ff4d4d;
-            color: white;
-        }
-
-        .btn-quick.switch {
-            background: #6c757d;
-            color: white;
+        .footer .company {
+            color: #ff4d4d;
+            font-weight: 600;
         }
 
         .tab-container {
             display: flex;
-            margin-bottom: 25px;
+            margin-bottom: 22px;
             border-bottom: 2px solid #e0e0e0;
+            flex-shrink: 0;
         }
 
         .tab {
             flex: 1;
             text-align: center;
-            padding: 10px;
+            padding: 12px;
             cursor: pointer;
             color: #666;
-            font-weight: 500;
+            font-weight: 600;
             transition: all 0.3s ease;
+            font-size: 16px;
         }
 
         .tab.active {
@@ -172,46 +178,13 @@
 
         .form-container h2 {
             color: #333;
-            margin-bottom: 25px;
-            font-size: 24px;
+            margin-bottom: 22px;
+            font-size: 22px;
             text-align: center;
-            position: relative;
-        }
-
-        .form-container h2::after {
-            content: "";
-            display: block;
-            width: 50px;
-            height: 3px;
-            background: #ff4d4d;
-            margin: 10px auto 0;
-            border-radius: 3px;
-        }
-
-        .remember-me {
-            display: flex;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        .remember-me input {
-            width: auto;
-            margin-right: 10px;
-        }
-
-        .remember-me label {
-            color: #666;
-            font-size: 14px;
-        }
-
-        .filipino {
-            font-size: 12px;
-            color: #666;
-            font-style: italic;
         }
 
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 18px;
         }
 
         .form-group label {
@@ -219,27 +192,23 @@
             margin-bottom: 5px;
             color: #555;
             font-weight: 500;
+            font-size: 14px;
         }
 
         .form-group input {
             width: 100%;
-            padding: 12px 15px;
+            padding: 14px;
             border: 2px solid #e0e0e0;
             border-radius: 10px;
-            font-size: 16px;
+            font-size: 15px;
             transition: border 0.3s ease;
+            -webkit-appearance: none;
+            background: white;
         }
 
         .form-group input:focus {
             outline: none;
             border-color: #ff4d4d;
-        }
-
-        .hint {
-            font-size: 12px;
-            color: #888;
-            margin-top: 5px;
-            display: block;
         }
 
         .btn-primary {
@@ -249,76 +218,81 @@
             color: white;
             border: none;
             border-radius: 10px;
-            font-size: 18px;
+            font-size: 17px;
             font-weight: bold;
             cursor: pointer;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            transition: all 0.2s ease;
             text-transform: uppercase;
+            letter-spacing: 1px;
+            -webkit-appearance: none;
+        }
+
+        .btn-primary:active {
+            transform: scale(0.98);
+            opacity: 0.9;
+        }
+
+        /* SOS Page - Clean version */
+        .sos-page {
+            display: none;
+            width: 100%;
+            max-width: 420px;
+            background: white;
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            flex-direction: column;
+        }
+
+        .sos-page.active {
+            display: flex;
+        }
+
+        .sos-header {
+            background: linear-gradient(135deg, #ff4d4d 0%, #cc0000 100%);
+            padding: 20px;
+            text-align: center;
+            color: white;
+        }
+
+        .sos-logo {
+            font-size: 28px;
+            font-weight: 900;
+            display: block;
             letter-spacing: 1px;
         }
 
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(255,77,77,0.3);
+        .sos-content {
+            padding: 30px 20px;
+            background: white;
         }
 
-        .btn-secondary {
-            width: 100%;
-            padding: 12px;
-            background: #333;
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            cursor: pointer;
-            margin-top: 10px;
-            transition: background 0.3s ease;
-        }
-
-        .btn-secondary:hover {
-            background: #555;
-        }
-
-        .sos-container {
+        .user-info-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 16px;
+            margin-bottom: 30px;
             text-align: center;
-            display: none;
-        }
-
-        .sos-container.active {
-            display: block;
-        }
-
-        .user-info {
-            background: #f5f5f5;
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 25px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
             border-left: 4px solid #ff4d4d;
         }
 
-        .user-info span:first-child {
+        .user-name-display {
+            font-size: 24px;
             font-weight: bold;
             color: #333;
+            margin-bottom: 8px;
         }
 
-        .status-badge {
-            background: #4caf50;
-            color: white;
-            padding: 5px 10px;
-            border-radius: 20px;
-            font-size: 12px;
+        .user-group-display {
+            color: #ff4d4d;
+            font-weight: 600;
+            font-size: 16px;
         }
 
-        .group-badge {
-            background: #ff4d4d;
-            color: white;
-            padding: 5px 10px;
-            border-radius: 20px;
-            font-size: 12px;
-            margin-left: 5px;
+        .sos-button-container {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0 30px;
         }
 
         .sos-button {
@@ -326,56 +300,63 @@
             height: 220px;
             border-radius: 50%;
             background: linear-gradient(135deg, #ff4d4d, #cc0000);
-            border: 8px solid #ff9999;
+            border: 8px solid #ffb3b3;
             color: white;
             font-weight: bold;
             cursor: pointer;
-            animation: pulse 2s infinite;
-            margin: 20px auto;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            box-shadow: 0 10px 30px rgba(255,68,68,0.4);
-            transition: transform 0.3s ease;
+            box-shadow: 0 15px 30px rgba(255,68,68,0.4);
+            transition: all 0.3s ease;
         }
 
-        .sos-button:active {
+        .sos-button.active {
             transform: scale(0.95);
+            border-color: #ff4d4d;
+            background: linear-gradient(135deg, #b30000, #800000);
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.3);
+            animation: pulse 1.5s infinite;
         }
 
         @keyframes pulse {
             0% {
-                transform: scale(1);
-                box-shadow: 0 0 0 0 rgba(255,68,68,0.7);
+                box-shadow: 0 0 0 0 rgba(255,68,68,0.7), inset 0 0 20px rgba(0,0,0,0.3);
             }
             70% {
-                transform: scale(1.05);
-                box-shadow: 0 0 0 20px rgba(255,68,68,0);
+                box-shadow: 0 0 0 15px rgba(255,68,68,0), inset 0 0 20px rgba(0,0,0,0.3);
             }
             100% {
-                transform: scale(1);
-                box-shadow: 0 0 0 0 rgba(255,68,68,0);
+                box-shadow: 0 0 0 0 rgba(255,68,68,0), inset 0 0 20px rgba(0,0,0,0.3);
             }
         }
 
         .sos-text {
-            font-size: 56px;
+            font-size: 52px;
             margin-bottom: 5px;
             font-weight: 900;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
         }
 
-        .sos-sub {
+        .sos-instruction {
             font-size: 16px;
-            opacity: 0.9;
+            font-weight: 500;
+            text-align: center;
+            padding: 0 10px;
+        }
+
+        .sos-button.active .sos-text {
+            font-size: 48px;
         }
 
         .status-message {
             margin: 20px 0;
-            padding: 15px;
-            border-radius: 10px;
+            padding: 16px;
+            border-radius: 12px;
             font-weight: 500;
+            font-size: 15px;
+            text-align: center;
         }
 
         .success {
@@ -402,17 +383,6 @@
             border: 1px solid #ffeeba;
         }
 
-        .hidden {
-            display: none;
-        }
-
-        .message {
-            margin-top: 20px;
-            padding: 15px;
-            border-radius: 10px;
-            text-align: center;
-        }
-
         .emergency-history {
             margin-top: 30px;
             text-align: left;
@@ -425,18 +395,24 @@
         }
 
         .history-item {
-            background: #f9f9f9;
-            padding: 15px;
-            border-radius: 10px;
+            background: #f8f9fa;
+            padding: 14px;
+            border-radius: 12px;
             margin-bottom: 10px;
             border-left: 4px solid #ff4d4d;
             animation: fadeIn 0.3s ease;
         }
 
+        .history-item.active {
+            border-left-color: #ff4d4d;
+            background: #fff3f3;
+            font-weight: 500;
+        }
+
         @keyframes fadeIn {
             from {
                 opacity: 0;
-                transform: translateY(-10px);
+                transform: translateY(-8px);
             }
             to {
                 opacity: 1;
@@ -447,7 +423,8 @@
         .history-item small {
             color: #666;
             display: block;
-            margin-top: 5px;
+            margin-top: 6px;
+            font-size: 12px;
         }
 
         .modal {
@@ -460,18 +437,18 @@
             background: rgba(0,0,0,0.5);
             justify-content: center;
             align-items: center;
-            z-index: 1000;
+            z-index: 2000;
             backdrop-filter: blur(5px);
         }
 
         .modal-content {
             background: white;
             padding: 30px;
-            border-radius: 20px;
+            border-radius: 24px;
             max-width: 300px;
             text-align: center;
             animation: modalSlide 0.3s ease;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
         }
 
         @keyframes modalSlide {
@@ -493,217 +470,141 @@
 
         .modal-content p {
             color: #666;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
+            font-size: 16px;
         }
 
-        .modal button {
-            margin: 10px;
-            padding: 10px 30px;
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .modal-btn {
+            flex: 1;
+            padding: 14px;
             border: none;
-            border-radius: 5px;
+            border-radius: 10px;
             cursor: pointer;
             font-weight: bold;
+            font-size: 16px;
             transition: transform 0.2s ease;
         }
 
-        .modal button:hover {
-            transform: translateY(-2px);
-        }
-
-        #confirmYes {
+        .modal-btn.yes {
             background: #ff4d4d;
             color: white;
         }
 
-        #confirmNo {
+        .modal-btn.no {
             background: #e0e0e0;
             color: #333;
         }
 
-        .footer {
-            text-align: center;
-            padding: 15px 20px;
-            background: #1a1a2e;
-            color: white;
-            font-size: 12px;
-            border-top: 2px solid #ff4d4d;
+        .hidden {
+            display: none !important;
         }
 
-        .footer .developed-by {
-            color: #ff4d4d;
-            font-weight: bold;
-            font-size: 14px;
-            display: block;
-            margin-bottom: 5px;
-        }
-
-        .footer .company {
-            color: #ff9999;
-            font-weight: 600;
-        }
-
-        .setup-instructions {
-            background: #e3f2fd;
-            border-left: 4px solid #2196f3;
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            font-size: 14px;
-        }
-
-        .setup-instructions h4 {
-            color: #0d47a1;
-            margin-bottom: 10px;
-        }
-
-        .setup-instructions ol {
-            padding-left: 20px;
-            color: #333;
-        }
-
-        .setup-instructions li {
-            margin-bottom: 5px;
-        }
-
-        .offline-notice {
-            background: #fff3cd;
-            border-left: 4px solid #ffc107;
-            padding: 10px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            font-size: 12px;
-            display: none;
+        input[type="email"], 
+        input[type="password"], 
+        input[type="tel"], 
+        input[type="text"] {
+            font-size: 16px;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <span class="logo-text">DIMAX SOS</span>
-            <span class="logo-sub">Emergency Response System</span>
-            <span class="tagline">🇵🇭 Ligtas ang bawat Pilipino • Mabilis na Tugon</span>
-        </div>
-
-        <div class="content">
-            <!-- Offline Notice -->
-            <div id="offlineNotice" class="offline-notice">
-                ⚠️ You are offline. Some features may be limited.
+    <div class="full-screen">
+        <!-- Landing Page (Login/Register) -->
+        <div id="landingPage" class="container">
+            <div class="landing-header">
+                <span class="landing-logo">DIMAX SOS</span>
+                <span class="landing-sub">Emergency Response System</span>
+                <span class="landing-tagline">🇵🇭 Ligtas ang bawat Pilipino</span>
             </div>
 
-            <!-- Setup Instructions (will show if Firebase Auth not enabled) -->
-            <div id="setupInstructions" class="setup-instructions" style="display: none;">
-                <h4>🔧 Firebase Setup Required</h4>
-                <p>Please enable Email/Password authentication in your Firebase console:</p>
-                <ol>
-                    <li>Go to <a href="https://console.firebase.google.com/project/dimax-sos/authentication" target="_blank">Firebase Authentication</a></li>
-                    <li>Click "Get Started" or "Set up sign-in method"</li>
-                    <li>Enable "Email/Password" sign-in provider</li>
-                    <li>Click "Save"</li>
-                    <li>Refresh this page</li>
-                </ol>
-            </div>
-
-            <!-- Quick Access for Returning Users -->
-            <div id="quickAccess" class="quick-access">
-                <div>
-                    <span>👋 Welcome back, <span id="quickAccessEmail" class="user-email"></span></span>
-                </div>
-                <div class="quick-access-buttons">
-                    <button id="quickLoginBtn" class="btn-quick login">Quick Login</button>
-                    <button id="switchAccountBtn" class="btn-quick switch">Switch Account</button>
-                </div>
-            </div>
-
-            <!-- Login/Register Tabs -->
             <div class="tab-container">
                 <div class="tab active" onclick="switchTab('login')">Login</div>
                 <div class="tab" onclick="switchTab('register')">Register</div>
             </div>
 
-            <!-- Login Form -->
-            <div id="loginForm" class="form-container active">
-                <h2>Mag-login</h2>
-                <form id="loginFormElement">
-                    <div class="form-group">
-                        <label>Email</label>
-                        <input type="email" id="loginEmail" placeholder="email@example.com" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Password</label>
-                        <input type="password" id="loginPassword" placeholder="********" required>
-                    </div>
-                    
-                    <div class="remember-me">
-                        <input type="checkbox" id="rememberMe" checked>
-                        <label for="rememberMe">Remember me (stay logged in)</label>
-                    </div>
-                    
-                    <button type="submit" class="btn-primary">Mag-login</button>
-                </form>
-                <div id="loginMessage" class="message"></div>
+            <div class="content-scroll">
+                <!-- Login Form -->
+                <div id="loginForm" class="form-container active">
+                    <h2>Mag-login</h2>
+                    <form id="loginFormElement">
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" id="loginEmail" placeholder="email@example.com" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Password</label>
+                            <input type="password" id="loginPassword" placeholder="********" required>
+                        </div>
+                        <button type="submit" class="btn-primary">Mag-login</button>
+                    </form>
+                    <div id="loginMessage" class="message" style="margin-top: 15px;"></div>
+                </div>
+
+                <!-- Registration Form -->
+                <div id="registerForm" class="form-container">
+                    <h2>Magparehistro</h2>
+                    <form id="registerFormElement">
+                        <div class="form-group">
+                            <label>Pangalan <span style="color: #666; font-size: 12px;">(First Name)</span></label>
+                            <input type="text" id="firstName" placeholder="Juan" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Apelyido <span style="color: #666; font-size: 12px;">(Last Name)</span></label>
+                            <input type="text" id="lastName" placeholder="Dela Cruz" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" id="regEmail" placeholder="email@example.com" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Password</label>
+                            <input type="password" id="regPassword" placeholder="Minimum 6 characters" required minlength="6">
+                        </div>
+                        <div class="form-group">
+                            <label>Contact Number</label>
+                            <input type="tel" id="contactNumber" placeholder="09123456789" required pattern="[0-9]{11}" maxlength="11">
+                        </div>
+                        <div class="form-group">
+                            <label>Registration Code</label>
+                            <input type="text" id="regCode" placeholder="Enter DIMAX group code" required>
+                            <small style="color: #888; font-size: 12px; display: block; margin-top: 5px;">Ipasok ang code na ibinigay ng inyong grupo</small>
+                        </div>
+                        <button type="submit" class="btn-primary">Magparehistro</button>
+                    </form>
+                    <div id="registerMessage" class="message" style="margin-top: 15px;"></div>
+                </div>
             </div>
 
-            <!-- Registration Form -->
-            <div id="registerForm" class="form-container">
-                <h2>Magparehistro</h2>
-                <form id="registerFormElement">
-                    <div class="form-group">
-                        <label>Pangalan <span class="filipino">(First Name)</span></label>
-                        <input type="text" id="firstName" placeholder="Juan" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Apelyido <span class="filipino">(Last Name)</span></label>
-                        <input type="text" id="lastName" placeholder="Dela Cruz" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Email</label>
-                        <input type="email" id="regEmail" placeholder="email@example.com" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Password</label>
-                        <input type="password" id="regPassword" placeholder="Minimum 6 characters" required minlength="6">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Contact Number</label>
-                        <input type="tel" id="contactNumber" placeholder="09123456789" required pattern="[0-9]{11}" maxlength="11">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Registration Code <span class="filipino">(Group Code)</span></label>
-                        <input type="text" id="regCode" placeholder="Enter DIMAX group code" required>
-                        <small class="hint">Ipasok ang code na ibinigay ng inyong grupo</small>
-                    </div>
-                    
-                    <div class="remember-me">
-                        <input type="checkbox" id="rememberMeRegister" checked>
-                        <label for="rememberMeRegister">Remember me (stay logged in)</label>
-                    </div>
-                    
-                    <button type="submit" class="btn-primary">Magparehistro</button>
-                </form>
-                <div id="registerMessage" class="message"></div>
+            <div class="footer">
+                <span>🚨 DIMAX SOS</span><br>
+                <span>Developed by <span class="company">RP8 & Dimax</span></span>
             </div>
+        </div>
 
-            <!-- SOS Section -->
-            <div id="sosSection" class="sos-container">
-                <h2>DIMAX Emergency</h2>
-                <div class="user-info">
-                    <span id="displayName"></span>
-                    <span>
-                        <span class="status-badge">✅ Naka-rehistro</span>
-                        <span id="groupBadge" class="group-badge"></span>
-                    </span>
+        <!-- SOS Page - Clean version -->
+        <div id="sosPage" class="sos-page">
+            <div class="sos-header">
+                <span class="sos-logo">DIMAX Emergency</span>
+            </div>
+            
+            <div class="sos-content">
+                <div class="user-info-card">
+                    <div class="user-name-display" id="displayName"></div>
+                    <div class="user-group-display" id="groupBadge"></div>
                 </div>
                 
-                <button id="sosButton" class="sos-button">
-                    <span class="sos-text">SOS</span>
-                    <span class="sos-sub">Pindutin kung may emergency</span>
-                </button>
+                <div class="sos-button-container">
+                    <button id="sosButton" class="sos-button">
+                        <span class="sos-text">SOS</span>
+                        <span class="sos-instruction">Pindutin kung may emergency</span>
+                    </button>
+                </div>
                 
                 <div id="sosStatus" class="status-message"></div>
                 
@@ -711,128 +612,83 @@
                     <h3>📋 Kasaysayan ng Emergency</h3>
                     <div id="historyList"></div>
                 </div>
-                
-                <button id="logoutBtn" class="btn-secondary">Mag-logout</button>
             </div>
         </div>
+    </div>
 
-        <div class="footer">
-            <span class="developed-by">🚨 DIMAX SOS</span>
-            <span>Developed and Patented by <span class="company">RP8 & Dimax</span></span>
+    <!-- Confirmation Modal -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content">
+            <h3>⚠️ Kumpirmahin</h3>
+            <p>Sigurado ka bang may emergency?</p>
+            <div class="modal-buttons">
+                <button id="confirmYes" class="modal-btn yes">Oo</button>
+                <button id="confirmNo" class="modal-btn no">Hindi</button>
+            </div>
         </div>
     </div>
 
     <script>
-        // Firebase Configuration
         const firebaseConfig = {
             apiKey: "AIzaSyBXE3cnFZwFH7EhxwdIWjHh18s-xfWpCFs",
             authDomain: "dimax-sos.firebaseapp.com",
             projectId: "dimax-sos",
             storageBucket: "dimax-sos.firebasestorage.app",
             messagingSenderId: "1003766190116",
-            appId: "1:1003766190116:web:921944e615fa39260a08b1",
-            measurementId: "G-044SM39EQ7"
+            appId: "1:1003766190116:web:921944e615fa39260a08b1"
         };
 
         // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
-        
-        // Set persistence to LOCAL for automatic login
-        auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
-            .then(() => {
-                console.log('Auth persistence set to LOCAL');
-            })
-            .catch((error) => {
-                console.error('Error setting persistence:', error);
-            });
 
-        // Collections
+        // Set persistence
+        auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+
         const USERS_COLLECTION = 'registered_users';
         const EMERGENCIES_COLLECTION = 'emergencies';
         const CODES_COLLECTION = 'registration_codes';
         const GROUPS_COLLECTION = 'groups';
-        const ADMIN_COLLECTION = 'users';
 
-        // Global variables
         let isSOSActive = false;
         let watchPositionId = null;
         let currentEmergencyId = null;
+        let currentUserData = null;
 
-        // Check online status
-        window.addEventListener('online', updateOnlineStatus);
-        window.addEventListener('offline', updateOnlineStatus);
-        
-        function updateOnlineStatus() {
-            const offlineNotice = document.getElementById('offlineNotice');
-            offlineNotice.style.display = navigator.onLine ? 'none' : 'block';
-        }
-        updateOnlineStatus();
-
-        // Check authentication state
+        // Auth state observer
         auth.onAuthStateChanged(async (user) => {
             if (user) {
-                try {
-                    const userDoc = await db.collection(USERS_COLLECTION).doc(user.uid).get();
-                    if (userDoc.exists) {
-                        showSOSSection(userDoc.data());
-                        loadEmergencyHistory(user.uid);
-                        localStorage.setItem('dimax_last_email', user.email);
-                    } else {
-                        await auth.signOut();
-                        localStorage.removeItem('dimax_last_email');
-                        localStorage.removeItem('dimax_last_password');
-                    }
-                } catch (error) {
-                    console.error('Error fetching user data:', error);
+                const userDoc = await db.collection(USERS_COLLECTION).doc(user.uid).get();
+                if (userDoc.exists) {
+                    currentUserData = userDoc.data();
+                    showSOSPage();
+                    loadEmergencyHistory(user.uid);
                 }
             } else {
-                document.getElementById('sosSection').classList.remove('active');
-                document.getElementById('loginForm').classList.add('active');
-                document.querySelectorAll('.tab')[0].classList.add('active');
-                document.querySelectorAll('.tab')[1].classList.remove('active');
-                checkSavedCredentials();
+                showLandingPage();
             }
         });
 
-        // Check for saved credentials
-        function checkSavedCredentials() {
-            const savedEmail = localStorage.getItem('dimax_last_email');
-            if (savedEmail) {
-                document.getElementById('quickAccessEmail').textContent = savedEmail;
-                document.getElementById('quickAccess').style.display = 'block';
-                document.getElementById('loginEmail').value = savedEmail;
+        function showSOSPage() {
+            document.getElementById('landingPage').style.display = 'none';
+            document.getElementById('sosPage').classList.add('active');
+            document.getElementById('displayName').textContent = `${currentUserData.firstName} ${currentUserData.lastName}`;
+            if (currentUserData.groupName) {
+                document.getElementById('groupBadge').textContent = `👥 ${currentUserData.groupName}`;
             }
         }
 
-        // Quick Login
-        document.getElementById('quickLoginBtn').addEventListener('click', async () => {
-            const savedEmail = localStorage.getItem('dimax_last_email');
-            const savedPassword = localStorage.getItem('dimax_last_password');
-            
-            if (savedEmail && savedPassword) {
-                document.getElementById('loginEmail').value = savedEmail;
-                document.getElementById('loginPassword').value = savedPassword;
-                document.getElementById('loginFormElement').dispatchEvent(new Event('submit'));
-            }
-        });
+        function showLandingPage() {
+            document.getElementById('landingPage').style.display = 'block';
+            document.getElementById('sosPage').classList.remove('active');
+        }
 
-        // Switch Account
-        document.getElementById('switchAccountBtn').addEventListener('click', () => {
-            document.getElementById('quickAccess').style.display = 'none';
-            localStorage.removeItem('dimax_last_email');
-            localStorage.removeItem('dimax_last_password');
-        });
-
-        // Switch between login and register tabs
         window.switchTab = function(tab) {
             const tabs = document.querySelectorAll('.tab');
             const forms = document.querySelectorAll('.form-container');
-            
             tabs.forEach(t => t.classList.remove('active'));
             forms.forEach(f => f.classList.remove('active'));
-            
             if (tab === 'login') {
                 tabs[0].classList.add('active');
                 document.getElementById('loginForm').classList.add('active');
@@ -845,43 +701,18 @@
         // Handle Login
         document.getElementById('loginFormElement').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
             const email = document.getElementById('loginEmail').value;
             const password = document.getElementById('loginPassword').value;
-            const messageDiv = document.getElementById('loginMessage');
-            
             try {
-                const userCredential = await auth.signInWithEmailAndPassword(email, password);
-                
-                if (document.getElementById('rememberMe').checked) {
-                    localStorage.setItem('dimax_last_email', email);
-                    localStorage.setItem('dimax_last_password', password);
-                }
-                
-                messageDiv.innerHTML = '✅ Login successful!';
-                messageDiv.className = 'message success';
-                
+                await auth.signInWithEmailAndPassword(email, password);
             } catch (error) {
-                let errorMessage = '❌ Login failed. ';
-                switch(error.code) {
-                    case 'auth/user-not-found':
-                        errorMessage += 'User not found. Please register first.';
-                        break;
-                    case 'auth/wrong-password':
-                        errorMessage += 'Incorrect password.';
-                        break;
-                    default:
-                        errorMessage += error.message;
-                }
-                messageDiv.innerHTML = errorMessage;
-                messageDiv.className = 'message error';
+                document.getElementById('loginMessage').innerHTML = '❌ Login failed';
             }
         });
 
         // Handle Registration
         document.getElementById('registerFormElement').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
             const firstName = document.getElementById('firstName').value;
             const lastName = document.getElementById('lastName').value;
             const email = document.getElementById('regEmail').value;
@@ -889,127 +720,55 @@
             const contactNumber = document.getElementById('contactNumber').value;
             const regCode = document.getElementById('regCode').value;
             const messageDiv = document.getElementById('registerMessage');
-            
-            if (!/^\d{11}$/.test(contactNumber)) {
-                messageDiv.innerHTML = '❌ Invalid contact number. Dapat 11 digits.';
-                messageDiv.className = 'message error';
-                return;
-            }
-            
+
             try {
                 const codeQuery = await db.collection(CODES_COLLECTION)
                     .where('code', '==', regCode)
                     .where('used', '==', false)
                     .get();
-                
+
                 if (codeQuery.empty) {
-                    messageDiv.innerHTML = '❌ Invalid or expired registration code.';
-                    messageDiv.className = 'message error';
+                    messageDiv.innerHTML = '❌ Invalid registration code';
                     return;
                 }
-                
-                const codeData = codeQuery.docs[0].data();
-                const groupDoc = await db.collection(GROUPS_COLLECTION).doc(codeData.groupId).get();
+
+                const groupId = codeQuery.docs[0].data().groupId;
+                const groupDoc = await db.collection(GROUPS_COLLECTION).doc(groupId).get();
                 const groupName = groupDoc.exists ? groupDoc.data().name : 'Unknown Group';
-                
+
                 const userCredential = await auth.createUserWithEmailAndPassword(email, password);
                 const user = userCredential.user;
-                
+
                 await db.collection(USERS_COLLECTION).doc(user.uid).set({
                     userId: user.uid,
                     firstName: firstName,
                     lastName: lastName,
                     email: email,
                     contactNumber: contactNumber,
-                    groupId: codeData.groupId,
+                    groupId: groupId,
                     groupName: groupName,
                     registeredAt: firebase.firestore.FieldValue.serverTimestamp(),
                     status: 'active'
                 });
-                
+
                 await codeQuery.docs[0].ref.update({
                     used: true,
-                    usedBy: user.uid,
-                    usedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    usedBy: user.uid
                 });
-                
-                if (document.getElementById('rememberMeRegister').checked) {
-                    localStorage.setItem('dimax_last_email', email);
-                    localStorage.setItem('dimax_last_password', password);
-                }
-                
-                messageDiv.innerHTML = '✅ Registration successful!';
-                messageDiv.className = 'message success';
-                
+
             } catch (error) {
-                let errorMessage = '❌ Registration failed. ';
-                if (error.code === 'auth/email-already-in-use') {
-                    errorMessage += 'Email already registered.';
-                } else {
-                    errorMessage += error.message;
-                }
-                messageDiv.innerHTML = errorMessage;
-                messageDiv.className = 'message error';
+                messageDiv.innerHTML = '❌ Registration failed: ' + error.message;
             }
         });
 
-        // Show SOS section
-        function showSOSSection(userData) {
-            document.getElementById('loginForm').classList.remove('active');
-            document.getElementById('registerForm').classList.remove('active');
-            document.getElementById('sosSection').classList.add('active');
-            document.getElementById('quickAccess').style.display = 'none';
-            document.getElementById('displayName').textContent = `👤 ${userData.firstName} ${userData.lastName}`;
-            
-            if (userData.groupName) {
-                document.getElementById('groupBadge').textContent = `👥 ${userData.groupName}`;
-            }
-        }
-
-        // Load emergency history
-        async function loadEmergencyHistory(userId) {
-            try {
-                const snapshot = await db.collection(EMERGENCIES_COLLECTION)
-                    .where('userId', '==', userId)
-                    .orderBy('timestamp', 'desc')
-                    .limit(10)
-                    .get();
-                
-                const historyList = document.getElementById('historyList');
-                historyList.innerHTML = '';
-                
-                if (snapshot.empty) {
-                    historyList.innerHTML = '<p class="info">Walang record ng emergency.</p>';
-                    return;
-                }
-                
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    const date = data.timestamp ? new Date(data.timestamp.seconds * 1000).toLocaleString() : 'Unknown';
-                    
-                    const item = document.createElement('div');
-                    item.className = 'history-item';
-                    item.innerHTML = `
-                        <strong>🚨 Emergency</strong><br>
-                        ${data.location ? '📍 With location' : '📍 No location'}<br>
-                        <small>📅 ${date}</small>
-                    `;
-                    historyList.appendChild(item);
-                });
-            } catch (error) {
-                console.error('Error loading history:', error);
-            }
-        }
-
-        // Get current position - THIS triggers the browser's native permission popup
+        // Get current position - TRIGGERS BROWSER POPUP
         function getCurrentPosition() {
             return new Promise((resolve, reject) => {
                 if (!navigator.geolocation) {
                     reject(new Error('Geolocation not supported'));
                     return;
                 }
-                
-                console.log('Requesting location permission...');
+                // THIS is what shows the browser's native "Allow" popup
                 navigator.geolocation.getCurrentPosition(resolve, reject, {
                     enableHighAccuracy: true,
                     timeout: 30000,
@@ -1018,7 +777,7 @@
             });
         }
 
-        // Start watching position
+        // Start watching position for continuous tracking
         function startWatchingPosition(emergencyId) {
             if (!navigator.geolocation) return;
             
@@ -1033,24 +792,16 @@
                                 },
                                 lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
                             });
-                            console.log('Location updated');
                         } catch (error) {
                             console.error('Error updating location:', error);
                         }
                     }
                 },
-                (error) => {
-                    console.error('Watch error:', error);
-                },
-                {
-                    enableHighAccuracy: true,
-                    maximumAge: 0,
-                    timeout: 5000
-                }
+                (error) => console.error('Watch error:', error),
+                { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
             );
         }
 
-        // Stop watching position
         function stopWatchingPosition() {
             if (watchPositionId) {
                 navigator.geolocation.clearWatch(watchPositionId);
@@ -1058,7 +809,41 @@
             }
         }
 
-        // Handle SOS Button
+        async function loadEmergencyHistory(userId) {
+            try {
+                const snapshot = await db.collection(EMERGENCIES_COLLECTION)
+                    .where('userId', '==', userId)
+                    .orderBy('timestamp', 'desc')
+                    .limit(10)
+                    .get();
+                
+                const historyList = document.getElementById('historyList');
+                historyList.innerHTML = '';
+                
+                if (snapshot.empty) {
+                    historyList.innerHTML = '<p style="color: #666; text-align: center; padding: 15px;">Walang record ng emergency.</p>';
+                    return;
+                }
+                
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const date = data.timestamp ? new Date(data.timestamp.seconds * 1000).toLocaleString() : 'Unknown';
+                    const item = document.createElement('div');
+                    item.className = 'history-item';
+                    if (doc.id === currentEmergencyId) item.classList.add('active');
+                    item.innerHTML = `
+                        <strong>🚨 Emergency</strong><br>
+                        ${data.location ? '📍 With location' : '📍 No location'}<br>
+                        <small>📅 ${date}</small>
+                    `;
+                    historyList.appendChild(item);
+                });
+            } catch (error) {
+                console.error('Error loading history:', error);
+            }
+        }
+
+        // SOS Button handling
         const sosButton = document.getElementById('sosButton');
         const modal = document.getElementById('confirmModal');
         const confirmYes = document.getElementById('confirmYes');
@@ -1072,66 +857,50 @@
             }
         });
 
-        confirmNo.addEventListener('click', () => {
-            modal.style.display = 'none';
-        });
-
+        confirmNo.addEventListener('click', () => modal.style.display = 'none');
+        
         confirmYes.addEventListener('click', async () => {
             modal.style.display = 'none';
             await activateSOS();
         });
 
         window.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.style.display = 'none';
-            }
+            if (e.target === modal) modal.style.display = 'none';
         });
 
-        // Activate SOS
         async function activateSOS() {
             const statusDiv = document.getElementById('sosStatus');
             statusDiv.innerHTML = '📍 Ina-activate ang SOS...';
             statusDiv.className = 'status-message info';
-            
+
             try {
                 const user = auth.currentUser;
-                if (!user) {
-                    statusDiv.innerHTML = '❌ Please login first';
-                    statusDiv.className = 'status-message error';
-                    return;
-                }
-                
-                const userDoc = await db.collection(USERS_COLLECTION).doc(user.uid).get();
-                const userData = userDoc.data();
-                
-                // Create emergency record WITHOUT location first
+                if (!user) throw new Error('Not logged in');
+
+                // Create emergency record first
                 const emergencyData = {
                     userId: user.uid,
-                    userName: `${userData.firstName} ${userData.lastName}`,
-                    contactNumber: userData.contactNumber,
-                    groupId: userData.groupId,
-                    groupName: userData.groupName,
+                    userName: `${currentUserData.firstName} ${currentUserData.lastName}`,
+                    contactNumber: currentUserData.contactNumber,
+                    groupId: currentUserData.groupId,
+                    groupName: currentUserData.groupName,
                     timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                     status: 'active',
                     system: 'DIMAX SOS'
                 };
-                
-                // Save to Firestore
+
                 const emergencyRef = await db.collection(EMERGENCIES_COLLECTION).add(emergencyData);
                 currentEmergencyId = emergencyRef.id;
-                
+
                 isSOSActive = true;
                 sosButton.classList.add('active');
-                document.querySelector('.sos-sub').textContent = 'ENGAGED - Press to stop';
-                
+                document.querySelector('.sos-instruction').textContent = 'PRESS TO STOP';
                 statusDiv.innerHTML = '✅ SOS Activated - Binabasa ang lokasyon...';
-                
-                // Try to get location - THIS triggers the browser popup
+
+                // Try to get location - THIS triggers browser popup
                 try {
-                    console.log('Requesting location...');
                     const position = await getCurrentPosition();
                     
-                    // Update emergency with location
                     await db.collection(EMERGENCIES_COLLECTION).doc(currentEmergencyId).update({
                         location: {
                             lat: position.coords.latitude,
@@ -1144,110 +913,47 @@
                     startWatchingPosition(currentEmergencyId);
                     
                 } catch (locationError) {
-                    console.log('Location error:', locationError);
-                    // User denied or location unavailable - SOS still active
+                    // User denied or error - SOS still active
                     statusDiv.innerHTML = '✅ SOS Activated - Walang lokasyon';
                 }
-                
+
                 loadEmergencyHistory(user.uid);
-                
+
             } catch (error) {
                 console.error('SOS error:', error);
-                statusDiv.innerHTML = '❌ Failed to activate SOS. Please try again.';
+                statusDiv.innerHTML = '❌ Failed to activate SOS';
                 statusDiv.className = 'status-message error';
                 sosButton.classList.remove('active');
-                document.querySelector('.sos-sub').textContent = 'Pindutin kung may emergency';
             }
         }
 
-        // Deactivate SOS
         async function deactivateSOS() {
             stopWatchingPosition();
             
             if (currentEmergencyId) {
-                try {
-                    await db.collection(EMERGENCIES_COLLECTION).doc(currentEmergencyId).update({
-                        status: 'completed',
-                        endedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                } catch (error) {
-                    console.error('Error deactivating:', error);
-                }
+                await db.collection(EMERGENCIES_COLLECTION).doc(currentEmergencyId).update({
+                    status: 'completed',
+                    endedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
             }
             
             isSOSActive = false;
             currentEmergencyId = null;
             sosButton.classList.remove('active');
-            document.querySelector('.sos-sub').textContent = 'Pindutin kung may emergency';
+            document.querySelector('.sos-instruction').textContent = 'Pindutin kung may emergency';
             document.getElementById('sosStatus').innerHTML = '✅ SOS Deactivated';
             
-            const user = auth.currentUser;
-            if (user) {
-                loadEmergencyHistory(user.uid);
+            if (auth.currentUser) {
+                loadEmergencyHistory(auth.currentUser.uid);
             }
         }
 
-        // Handle Logout
-        document.getElementById('logoutBtn').addEventListener('click', async () => {
-            try {
-                if (isSOSActive) {
-                    await deactivateSOS();
-                }
-                localStorage.removeItem('dimax_last_email');
-                localStorage.removeItem('dimax_last_password');
-                await auth.signOut();
-            } catch (error) {
-                console.error('Logout error:', error);
-            }
+        // Auto-scroll for registration
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('focus', () => {
+                setTimeout(() => input.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
+            });
         });
-
-        // Create default admin and group
-        async function createDefaultAdmin() {
-            try {
-                const adminQuery = await db.collection(ADMIN_COLLECTION).where('role', '==', 'admin').limit(1).get();
-                if (adminQuery.empty) {
-                    const adminCredential = await auth.createUserWithEmailAndPassword('admin@dimax.com', 'admin123');
-                    const admin = adminCredential.user;
-                    await db.collection(ADMIN_COLLECTION).doc(admin.uid).set({
-                        userId: admin.uid,
-                        firstName: 'Admin',
-                        lastName: 'User',
-                        email: 'admin@dimax.com',
-                        role: 'admin',
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                }
-            } catch (error) {
-                console.log('Admin creation error:', error);
-            }
-        }
-
-        async function createDefaultGroup() {
-            try {
-                const groupsSnapshot = await db.collection(GROUPS_COLLECTION).limit(1).get();
-                if (groupsSnapshot.empty) {
-                    const groupRef = await db.collection(GROUPS_COLLECTION).add({
-                        name: 'Barangay 1',
-                        description: 'Default Barangay Group',
-                        createdBy: 'system',
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    
-                    await db.collection(CODES_COLLECTION).add({
-                        code: 'DIMAX2024',
-                        groupId: groupRef.id,
-                        used: false,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                }
-            } catch (error) {
-                console.error('Error creating default group:', error);
-            }
-        }
-
-        // Initialize default data
-        createDefaultAdmin();
-        createDefaultGroup();
     </script>
 </body>
 </html>
