@@ -128,6 +128,7 @@
             background: white;
             flex: 1;
             overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
         /* Footer */
@@ -150,6 +151,7 @@
             display: flex;
             margin-bottom: 22px;
             border-bottom: 2px solid #e0e0e0;
+            flex-shrink: 0;
         }
 
         .tab {
@@ -277,6 +279,7 @@
             background: white;
             flex: 1;
             overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
         .user-welcome {
@@ -452,14 +455,37 @@
             font-size: 12px;
         }
 
+        .permission-prompt {
+            background: #e3f2fd;
+            color: #0d47a1;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 15px;
+            text-align: center;
+            border: 1px solid #bbdefb;
+        }
+
+        .permission-prompt button {
+            background: #ff4d4d;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            margin-top: 8px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
         .permission-warning {
             background: #fff3cd;
             color: #856404;
-            padding: 10px;
+            padding: 12px;
             border-radius: 8px;
             font-size: 13px;
             margin-bottom: 15px;
             text-align: center;
+            border: 1px solid #ffeeba;
         }
 
         .hidden {
@@ -485,13 +511,14 @@
                 <span class="landing-tagline">🇵🇭 Ligtas ang bawat Pilipino</span>
             </div>
 
-            <div class="content-scroll">
-                <!-- Login/Register Tabs -->
-                <div class="tab-container">
-                    <div class="tab active" onclick="switchTab('login')">Login</div>
-                    <div class="tab" onclick="switchTab('register')">Register</div>
-                </div>
+            <!-- Login/Register Tabs - Fixed outside scrollable area -->
+            <div class="tab-container">
+                <div class="tab active" onclick="switchTab('login')">Login</div>
+                <div class="tab" onclick="switchTab('register')">Register</div>
+            </div>
 
+            <!-- Scrollable Content Area -->
+            <div class="content-scroll">
                 <!-- Login Form -->
                 <div id="loginForm" class="form-container active">
                     <h2>Mag-login</h2>
@@ -571,9 +598,15 @@
                     <div class="user-group" id="groupBadge"></div>
                 </div>
                 
+                <!-- Location permission prompt -->
+                <div id="permissionPrompt" class="permission-prompt hidden">
+                    <span>📍 DIMAX needs your location for emergency services</span>
+                    <button onclick="requestLocationPermission()">Allow Location Access</button>
+                </div>
+                
                 <!-- Location permission warning -->
                 <div id="permissionWarning" class="permission-warning hidden">
-                    ⚠️ Please enable location access for emergency services
+                    ⚠️ Location services are disabled. SOS will still be sent but without your location.
                 </div>
                 
                 <div class="sos-button-container">
@@ -626,6 +659,8 @@
         let isSOSActive = false;
         let watchPositionId = null;
         let currentEmergencyId = null;
+        let hasLocationPermission = false;
+        let locationPermissionDenied = false;
 
         // Check authentication state
         auth.onAuthStateChanged(async (user) => {
@@ -667,12 +702,72 @@
                 showPermissionWarning('Geolocation is not supported by your browser');
                 return;
             }
+            
+            // Try to get permission status
+            if (navigator.permissions && navigator.permissions.query) {
+                navigator.permissions.query({ name: 'geolocation' }).then(result => {
+                    if (result.state === 'granted') {
+                        hasLocationPermission = true;
+                        locationPermissionDenied = false;
+                        hidePermissionPrompt();
+                    } else if (result.state === 'prompt') {
+                        // Show prompt to ask for permission
+                        showPermissionPrompt();
+                    } else if (result.state === 'denied') {
+                        locationPermissionDenied = true;
+                        showPermissionWarning('Location access denied. SOS will be sent without location.');
+                    }
+                });
+            } else {
+                // Fallback for older browsers - show prompt
+                showPermissionPrompt();
+            }
+        }
+
+        // Request location permission
+        window.requestLocationPermission = function() {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    // Permission granted
+                    hasLocationPermission = true;
+                    locationPermissionDenied = false;
+                    hidePermissionPrompt();
+                    showStatusMessage('✅ Location access granted', 'success');
+                },
+                (error) => {
+                    // Permission denied
+                    locationPermissionDenied = true;
+                    hidePermissionPrompt();
+                    showPermissionWarning('Location access denied. SOS will be sent without location.');
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                }
+            );
+        };
+
+        function showPermissionPrompt() {
+            document.getElementById('permissionPrompt').classList.remove('hidden');
+            document.getElementById('permissionWarning').classList.add('hidden');
+        }
+
+        function hidePermissionPrompt() {
+            document.getElementById('permissionPrompt').classList.add('hidden');
         }
 
         function showPermissionWarning(message) {
             const warning = document.getElementById('permissionWarning');
             warning.textContent = `⚠️ ${message}`;
             warning.classList.remove('hidden');
+            document.getElementById('permissionPrompt').classList.add('hidden');
+        }
+
+        function showStatusMessage(message, type) {
+            const statusDiv = document.getElementById('sosStatus');
+            statusDiv.innerHTML = message;
+            statusDiv.className = `status-message ${type}`;
         }
 
         // Switch between login and register tabs
@@ -814,13 +909,14 @@
             return new Promise((resolve, reject) => {
                 if (!navigator.geolocation) {
                     reject(new Error('Geolocation not supported'));
-                } else {
-                    navigator.geolocation.getCurrentPosition(resolve, reject, {
-                        enableHighAccuracy: true,
-                        timeout: 10000,
-                        maximumAge: 0
-                    });
+                    return;
                 }
+                
+                navigator.geolocation.getCurrentPosition(resolve, reject, {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                });
             });
         }
 
@@ -897,9 +993,12 @@
                     if (doc.id === currentEmergencyId) {
                         historyItem.classList.add('active-emergency');
                     }
+                    
+                    const locationStatus = data.location ? '📍 With location' : '📍 No location';
+                    
                     historyItem.innerHTML = `
                         <strong>🚨 ${doc.id === currentEmergencyId ? 'Active Emergency' : 'Emergency'}</strong><br>
-                        📍 Location shared<br>
+                        ${locationStatus}<br>
                         <small>📅 ${date}</small>
                     `;
                     historyList.appendChild(historyItem);
@@ -923,7 +1022,7 @@
         // Activate SOS
         async function activateSOS() {
             const statusDiv = document.getElementById('sosStatus');
-            statusDiv.innerHTML = '📍 Kinukuha ang iyong lokasyon...';
+            statusDiv.innerHTML = '📍 Activating SOS...';
             statusDiv.className = 'status-message info';
             
             try {
@@ -939,8 +1038,29 @@
                 const userDoc = await db.collection(USERS_COLLECTION).doc(user.uid).get();
                 const userData = userDoc.data();
                 
-                // Get initial GPS location
-                const position = await getCurrentPosition();
+                let location = null;
+                let locationStatus = 'without location';
+                
+                // Try to get location if not previously denied
+                if (!locationPermissionDenied) {
+                    try {
+                        const position = await getCurrentPosition();
+                        location = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
+                        hasLocationPermission = true;
+                        locationStatus = 'with location';
+                        hidePermissionPrompt();
+                    } catch (locationError) {
+                        console.warn('Location error:', locationError);
+                        locationPermissionDenied = true;
+                        showPermissionWarning('Unable to get your location. SOS sent without location.');
+                        locationStatus = 'without location';
+                    }
+                } else {
+                    locationStatus = 'without location (permission denied)';
+                }
                 
                 // Create emergency record
                 const emergencyData = {
@@ -949,16 +1069,18 @@
                     contactNumber: userData.contactNumber,
                     groupId: userData.groupId,
                     groupName: userData.groupName,
-                    location: {
-                        lat: position.coords.latitude,
-                        lng: position.coords.longitude
-                    },
                     timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                     status: 'active',
-                    googleMapsLink: `https://www.google.com/maps?q=${position.coords.latitude},${position.coords.longitude}`,
                     system: 'DIMAX SOS',
-                    isActive: true
+                    isActive: true,
+                    hasLocation: !!location
                 };
+                
+                // Add location if available
+                if (location) {
+                    emergencyData.location = location;
+                    emergencyData.googleMapsLink = `https://www.google.com/maps?q=${location.lat},${location.lng}`;
+                }
                 
                 // Save to Firestore
                 const emergencyRef = await db.collection(EMERGENCIES_COLLECTION).add(emergencyData);
@@ -969,18 +1091,20 @@
                 sosButton.classList.add('active');
                 document.querySelector('.sos-instruction').textContent = 'ENGAGED - Press to stop';
                 
-                statusDiv.innerHTML = '✅ Emergency active - sharing location';
+                statusDiv.innerHTML = `✅ SOS Activated - ${locationStatus}`;
                 statusDiv.className = 'status-message success';
                 
-                // Start continuous location tracking
-                startWatchingPosition(currentEmergencyId);
+                // Start continuous location tracking if we have permission
+                if (location && !locationPermissionDenied) {
+                    startWatchingPosition(currentEmergencyId);
+                }
                 
                 // Refresh history
                 loadEmergencyHistory(user.uid);
                 
             } catch (error) {
                 console.error('SOS error:', error);
-                statusDiv.innerHTML = '❌ Failed to activate SOS. Please enable location services.';
+                statusDiv.innerHTML = '❌ Failed to activate SOS. Please try again.';
                 statusDiv.className = 'status-message error';
                 sosButton.classList.remove('active');
             }
@@ -1009,7 +1133,7 @@
                 sosButton.classList.remove('active');
                 document.querySelector('.sos-instruction').textContent = 'Pindutin kung may emergency';
                 
-                statusDiv.innerHTML = '✅ Emergency ended';
+                statusDiv.innerHTML = '✅ SOS Deactivated';
                 statusDiv.className = 'status-message info';
                 
                 // Refresh history
@@ -1028,6 +1152,15 @@
             if (e.target.nodeName === 'INPUT' || e.target.nodeName === 'TEXTAREA') {
                 e.target.style.fontSize = '16px';
             }
+        });
+
+        // Auto-scroll to bottom of forms when keyboard appears
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('focus', () => {
+                setTimeout(() => {
+                    input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 300);
+            });
         });
     </script>
 </body>
