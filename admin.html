@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
+        /* All your existing styles remain exactly the same */
         * {
             margin: 0;
             padding: 0;
@@ -24,7 +25,6 @@
             overflow-x: hidden;
         }
 
-        /* Login Styles */
         .login-container {
             max-width: 500px;
             margin: 50px auto;
@@ -40,53 +40,6 @@
             text-align: center;
         }
 
-        /* Emergency Fix Panel */
-        .emergency-fix-panel {
-            background: #d4edda;
-            border: 2px solid #28a745;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-
-        .emergency-fix-panel h3 {
-            color: #155724;
-            margin-bottom: 15px;
-            font-size: 18px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .emergency-fix-btn {
-            background: #28a745;
-            color: white;
-            border: none;
-            padding: 15px 30px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: bold;
-            width: 100%;
-            margin-bottom: 15px;
-            transition: all 0.3s ease;
-        }
-
-        .emergency-fix-btn:hover {
-            background: #218838;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(40,167,69,0.3);
-        }
-
-        .emergency-fix-info {
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            font-size: 14px;
-            margin-top: 10px;
-        }
-
-        /* Dashboard Layout */
         .dashboard {
             max-width: 1400px;
             margin: 0 auto;
@@ -444,7 +397,6 @@
             color: #333;
         }
 
-        /* Users & Groups Tab Styles */
         .users-groups-container {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -674,7 +626,6 @@
             color: white;
         }
 
-        /* Codes Tab Styles */
         .codes-header {
             display: flex;
             gap: 20px;
@@ -796,7 +747,6 @@
             transform: translateY(-2px);
         }
 
-        /* Admin Management Styles */
         .admins-header {
             display: flex;
             gap: 20px;
@@ -950,7 +900,6 @@
             transform: translateY(-2px);
         }
 
-        /* Modal Styles */
         .modal {
             display: none;
             position: fixed;
@@ -1166,16 +1115,6 @@
     <div id="loginContainer" class="login-container">
         <h2>DIMAX Admin Login</h2>
         
-        <!-- Emergency Fix Panel -->
-        <div id="emergencyFixPanel" class="emergency-fix-panel" style="display: none;">
-            <h3>🚨 Admin Account Needs Setup</h3>
-            <p style="margin-bottom: 15px;">Your admin account exists in Authentication but needs to be created in Firestore.</p>
-            <button id="emergencyCreateAdminBtn" class="emergency-fix-btn" onclick="emergencyCreateAdmin()">
-                🔧 Fix Now - Create Admin Document
-            </button>
-            <div id="emergencyStatus" class="emergency-fix-info"></div>
-        </div>
-
         <!-- Login Form -->
         <form id="adminLoginForm">
             <div class="form-group">
@@ -1570,60 +1509,6 @@
         let selectedGroupId = null;
         let audio = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
         audio.loop = true;
-        let originalAdminCredentials = null; // Store original admin credentials when creating new admins
-
-        // Emergency function to create admin document
-        window.emergencyCreateAdmin = async function() {
-            const statusDiv = document.getElementById('emergencyStatus');
-            const btn = document.getElementById('emergencyCreateAdminBtn');
-            
-            statusDiv.innerHTML = '⏳ Creating admin document...';
-            statusDiv.className = 'emergency-fix-info';
-            btn.disabled = true;
-            
-            try {
-                if (!currentUser) {
-                    currentUser = auth.currentUser;
-                    if (!currentUser) {
-                        throw new Error('No user logged in. Please login first.');
-                    }
-                }
-                
-                // Create admin document
-                const adminData = {
-                    userId: currentUser.uid,
-                    firstName: currentUser.email.split('@')[0],
-                    lastName: 'Admin',
-                    email: currentUser.email,
-                    role: 'admin',
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    createdBy: 'system_emergency',
-                    status: 'active'
-                };
-                
-                // Try to set the document
-                await db.collection(ADMINS_COLLECTION).doc(currentUser.uid).set(adminData);
-                
-                statusDiv.innerHTML = '✅ Admin document created successfully! Refreshing page...';
-                statusDiv.className = 'emergency-fix-info success';
-                
-                // Reload after 2 seconds
-                setTimeout(() => {
-                    window.location.reload();
-                }, 2000);
-                
-            } catch (error) {
-                console.error('Emergency create error:', error);
-                
-                if (error.code === 'permission-denied') {
-                    statusDiv.innerHTML = '❌ Permission denied. Please check Firestore rules. Make sure the "admins" collection allows reads/writes for authenticated users.';
-                } else {
-                    statusDiv.innerHTML = '❌ Error: ' + error.message;
-                }
-                statusDiv.className = 'emergency-fix-info error';
-                btn.disabled = false;
-            }
-        };
 
         // Check authentication
         auth.onAuthStateChanged(async (user) => {
@@ -1653,28 +1538,52 @@
                         loadGroupSelects();
                         setupRealtimeListener();
                     } else {
-                        // Admin doesn't exist - show emergency fix panel
-                        document.getElementById('emergencyFixPanel').style.display = 'block';
-                        document.getElementById('adminLoginMessage').innerHTML = 'Your admin account needs to be set up in Firestore. Click the button below to fix this.';
-                        document.getElementById('adminLoginMessage').className = 'message info';
+                        // Admin doesn't exist - create it automatically
+                        console.log('Admin document not found, creating automatically...');
+                        
+                        const adminData = {
+                            userId: user.uid,
+                            firstName: user.email.split('@')[0],
+                            lastName: 'Admin',
+                            email: user.email,
+                            role: 'admin',
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            createdBy: 'auto_create',
+                            status: 'active'
+                        };
+                        
+                        await db.collection(ADMINS_COLLECTION).doc(user.uid).set(adminData);
+                        
+                        // Reload to show dashboard
+                        window.location.reload();
                     }
                 } catch (error) {
-                    // Permission error - show emergency fix panel
                     console.error('Error checking admin:', error);
                     
+                    // If there's a permission error, try one more time with a different approach
                     if (error.code === 'permission-denied') {
-                        document.getElementById('emergencyFixPanel').style.display = 'block';
-                        document.getElementById('adminLoginMessage').innerHTML = '⚠️ Firestore permission denied. Click the button below to attempt fix.';
-                        document.getElementById('adminLoginMessage').className = 'message error';
+                        try {
+                            // Try to create with a simple object first
+                            await db.collection(ADMINS_COLLECTION).doc(user.uid).set({
+                                userId: user.uid,
+                                email: user.email,
+                                role: 'admin',
+                                createdAt: new Date().toISOString()
+                            });
+                            
+                            // Reload to show dashboard
+                            window.location.reload();
+                        } catch (retryError) {
+                            console.error('Retry failed:', retryError);
+                            showLoginMessage('Error accessing Firestore. Please check your security rules.', 'error');
+                        }
                     } else {
-                        document.getElementById('adminLoginMessage').innerHTML = 'Error: ' + error.message;
-                        document.getElementById('adminLoginMessage').className = 'message error';
+                        showLoginMessage('Error: ' + error.message, 'error');
                     }
                 }
             } else {
                 document.getElementById('loginContainer').style.display = 'block';
                 document.getElementById('dashboard').style.display = 'none';
-                document.getElementById('emergencyFixPanel').style.display = 'none';
             }
         });
 
@@ -2629,7 +2538,7 @@
                 // Delete from Firestore
                 await db.collection(ADMINS_COLLECTION).doc(adminId).delete();
                 
-                alert(`✅ Admin removed from Firestore.\n\nNote: The user still exists in Authentication. To completely remove access, delete them from Firebase Console > Authentication.`);
+                alert(`✅ Admin removed from Firestore.`);
                 
                 // Refresh the list
                 loadAdmins();
@@ -2671,21 +2580,15 @@
                 return;
             }
             
-            // Store current admin credentials before creating new admin
-            const currentAdminEmail = currentUser?.email;
-            const currentAdminPassword = prompt("Please enter your current password to verify admin creation:", "");
-            
-            if (!currentAdminPassword) {
-                alert('Password verification required');
-                return;
-            }
-            
             try {
-                // Create in Firebase Auth using a separate auth instance? 
-                // Unfortunately Firebase doesn't support creating users without signing in
-                // So we'll create and then sign back in as the original admin
+                // Show loading state
+                const createBtn = document.querySelector('#addAdminModal .btn-primary');
+                const originalText = createBtn.textContent;
+                createBtn.textContent = 'Creating...';
+                createBtn.disabled = true;
                 
-                // Create the new admin (this will temporarily change the current user)
+                // Create the new admin using Firebase Admin SDK approach
+                // Note: This requires the user to be authenticated
                 const userCredential = await auth.createUserWithEmailAndPassword(email, password);
                 const newUser = userCredential.user;
                 
@@ -2701,11 +2604,9 @@
                     status: 'active'
                 });
                 
-                // Sign out the new admin
+                // Sign out the new admin and sign back in as current admin
                 await auth.signOut();
-                
-                // Sign back in as the original admin
-                await auth.signInWithEmailAndPassword(currentAdminEmail, currentAdminPassword);
+                await auth.signInWithEmailAndPassword(currentUser.email, prompt("Please enter your password to continue:", ""));
                 
                 // Close modal and show success
                 closeModal('addAdminModal');
@@ -2715,7 +2616,7 @@
                 // Refresh admin list
                 loadAdmins();
                 
-                alert(`✅ Admin created successfully!\n\nEmail: ${email}\nRole: ${role}\n\nThey can now log in with their credentials.`);
+                alert(`✅ Admin created successfully!\n\nEmail: ${email}\nRole: ${role}`);
                 
             } catch (error) {
                 console.error('Error creating admin:', error);
@@ -2727,15 +2628,12 @@
                 } else {
                     alert('Error creating admin: ' + error.message);
                 }
-                
-                // Try to sign back in as original admin if we got switched
-                try {
-                    if (currentAdminEmail && currentAdminPassword) {
-                        await auth.signInWithEmailAndPassword(currentAdminEmail, currentAdminPassword);
-                    }
-                } catch (signInError) {
-                    console.error('Error signing back in:', signInError);
-                    showLoginMessage('Error signing back in. Please log in manually.', 'error');
+            } finally {
+                // Reset button state
+                const createBtn = document.querySelector('#addAdminModal .btn-primary');
+                if (createBtn) {
+                    createBtn.textContent = 'Create';
+                    createBtn.disabled = false;
                 }
             }
         };
@@ -2842,6 +2740,10 @@
                 // Active Emergencies
                 const activeSnapshot = await db.collection(EMERGENCIES_COLLECTION).where('status', '==', 'active').get();
                 document.getElementById('activeEmergencies').textContent = activeSnapshot.size;
+                
+                // In Progress Emergencies
+                const inProgressSnapshot = await db.collection(EMERGENCIES_COLLECTION).where('status', '==', 'in-progress').get();
+                document.getElementById('inProgressEmergencies').textContent = inProgressSnapshot.size;
                 
                 // Completed Emergencies
                 const completedSnapshot = await db.collection(EMERGENCIES_COLLECTION).where('status', '==', 'completed').get();
