@@ -207,6 +207,11 @@
             flex-shrink: 0;
         }
 
+        .footer .company {
+            color: #ff4d4d;
+            font-weight: 600;
+        }
+
         /* SOS Page - NO SCROLL, everything fits perfectly */
         .sos-page {
             display: none;
@@ -244,15 +249,14 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            padding: 15px 15px 10px 15px;
+            padding: 12px 15px 8px 15px;
             background: white;
             justify-content: space-between;
-            height: 100%;
         }
 
         .user-info-card {
             background: #f8f9fa;
-            padding: 12px;
+            padding: 10px;
             border-radius: 14px;
             text-align: center;
             border-left: 4px solid #ff4d4d;
@@ -275,16 +279,17 @@
         .sos-button-container {
             display: flex;
             justify-content: center;
-            margin: 8px 0;
+            margin: 5px 0 8px;
             flex-shrink: 0;
         }
 
+        /* BIGGER SOS BUTTON */
         .sos-button {
-            width: 180px;
-            height: 180px;
+            width: 220px;
+            height: 220px;
             border-radius: 50%;
             background: linear-gradient(135deg, #ff4d4d, #cc0000);
-            border: 6px solid #ffb3b3;
+            border: 8px solid #ffb3b3;
             color: white;
             font-weight: bold;
             cursor: pointer;
@@ -292,7 +297,7 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            box-shadow: 0 15px 30px rgba(255,68,68,0.4);
+            box-shadow: 0 20px 40px rgba(255,68,68,0.5);
             transition: all 0.2s ease;
         }
 
@@ -305,29 +310,30 @@
 
         @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(255,68,68,0.7); }
-            70% { box-shadow: 0 0 0 15px rgba(255,68,68,0); }
+            70% { box-shadow: 0 0 0 20px rgba(255,68,68,0); }
             100% { box-shadow: 0 0 0 0 rgba(255,68,68,0); }
         }
 
         .sos-text {
-            font-size: 42px;
+            font-size: 52px;
             font-weight: 900;
-            margin-bottom: 2px;
+            margin-bottom: 4px;
+            text-shadow: 2px 2px 0 rgba(0,0,0,0.2);
         }
 
         .sos-engaged {
-            font-size: 15px;
+            font-size: 18px;
             font-weight: 800;
         }
 
         .sos-press-to-stop {
-            font-size: 11px;
+            font-size: 13px;
             font-weight: 500;
-            margin-top: 2px;
+            margin-top: 3px;
         }
 
         .sos-instruction {
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 500;
             text-align: center;
             padding: 0 5px;
@@ -335,7 +341,7 @@
         }
 
         .status-message {
-            margin: 8px 0;
+            margin: 6px 0;
             padding: 8px;
             border-radius: 8px;
             font-size: 12px;
@@ -352,7 +358,7 @@
             font-size: 11px;
             color: #666;
             text-align: center;
-            margin: 5px 0 8px;
+            margin: 4px 0 6px;
             padding: 6px;
             background: #f8f9fa;
             border-radius: 6px;
@@ -365,12 +371,12 @@
             display: flex;
             flex-direction: column;
             min-height: 0;
-            margin-top: 5px;
+            margin-top: 4px;
         }
 
         .emergency-history h3 {
             color: #333;
-            margin-bottom: 6px;
+            margin-bottom: 5px;
             font-size: 14px;
             display: flex;
             align-items: center;
@@ -383,7 +389,7 @@
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 5px;
+            gap: 4px;
             padding-right: 2px;
         }
 
@@ -480,7 +486,7 @@
             </div>
         </div>
 
-        <!-- SOS Page - NO SCROLL, everything fits -->
+        <!-- SOS Page - NO SCROLL, bigger button -->
         <div id="sosPage" class="sos-page">
             <div class="sos-header">
                 <span class="sos-logo">DIMAX Emergency</span>
@@ -533,6 +539,7 @@
         let watchId = null;
         let currentEmergencyId = null;
         let currentUser = null;
+        let locationRequestInProgress = false;
 
         auth.onAuthStateChanged(async (user) => {
             if (user) {
@@ -640,13 +647,15 @@
             }
         });
 
-        // Location request - triggers Safari popup
+        // Location request - MUST be called directly from user gesture
         function requestLocation() {
             return new Promise((resolve, reject) => {
                 if (!navigator.geolocation) {
                     reject(new Error('Geolocation not supported'));
                     return;
                 }
+                
+                // This direct call triggers Safari's popup
                 navigator.geolocation.getCurrentPosition(resolve, reject, {
                     enableHighAccuracy: true,
                     timeout: 30000,
@@ -718,7 +727,10 @@
         const statusDiv = document.getElementById('sosStatus');
         const locationNote = document.getElementById('locationNote');
 
-        sosButton.addEventListener('click', async () => {
+        sosButton.addEventListener('click', async (event) => {
+            // Prevent multiple simultaneous requests
+            if (locationRequestInProgress) return;
+            
             if (isSOSActive) {
                 // STOP Pressed
                 stopTracking();
@@ -727,18 +739,25 @@
                 statusDiv.className = 'status-message info';
                 
             } else {
-                // SOS Pressed
-                statusDiv.innerHTML = '📍 Ina-activate...';
+                // SOS Pressed - Start location request IMMEDIATELY
+                locationRequestInProgress = true;
+                
+                statusDiv.innerHTML = '📍 Humihingi ng location...';
                 statusDiv.className = 'status-message info';
+                locationNote.innerHTML = '📍 Please allow location access';
                 
                 try {
+                    // Request location FIRST - this must be direct from click
+                    const position = await requestLocation();
+                    
+                    // If we get here, user allowed location
                     const user = auth.currentUser;
                     if (!user) throw new Error('Not logged in');
 
                     const userDoc = await db.collection(USERS_COLLECTION).doc(user.uid).get();
                     const userData = userDoc.data();
 
-                    // Send SOS immediately
+                    // Send SOS with location
                     const emergencyData = {
                         userId: user.uid,
                         userName: `${userData.firstName} ${userData.lastName}`,
@@ -746,7 +765,11 @@
                         groupId: userData.groupId,
                         groupName: userData.groupName,
                         timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                        status: 'active'
+                        status: 'active',
+                        location: {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        }
                     };
 
                     const docRef = await db.collection(EMERGENCIES_COLLECTION).add(emergencyData);
@@ -756,36 +779,59 @@
                     isSOSActive = true;
                     sosButton.classList.add('active');
                     document.querySelector('.sos-instruction').innerHTML = '<span class="sos-engaged">ENGAGED</span><br><span class="sos-press-to-stop">PRESS TO STOP</span>';
-                    statusDiv.innerHTML = '✅ SOS Sent - Kumukuha ng location...';
-                    locationNote.innerHTML = '📍 Hinihingi ang location...';
-
-                    // Ask for location - Safari popup
-                    try {
-                        const position = await requestLocation();
-                        
-                        await db.collection(EMERGENCIES_COLLECTION).doc(currentEmergencyId).update({
-                            location: {
-                                lat: position.coords.latitude,
-                                lng: position.coords.longitude
-                            }
-                        });
-                        
-                        statusDiv.innerHTML = '✅ SOS Active - Ibinahagi ang location';
-                        locationNote.innerHTML = '📍 Location shared';
-                        startTracking(currentEmergencyId);
-                        
-                    } catch (locError) {
-                        locationNote.innerHTML = '📍 Hindi nakuha ang location';
-                        statusDiv.innerHTML = '✅ SOS Active - Walang location';
-                    }
+                    statusDiv.innerHTML = '✅ SOS Active - Ibinahagi ang location';
+                    locationNote.innerHTML = '📍 Location shared - Salamat!';
                     
-                    loadHistory();
-
+                    // Start tracking
+                    startTracking(currentEmergencyId);
+                    
                 } catch (error) {
-                    statusDiv.innerHTML = '❌ Nabigo ang SOS';
-                    statusDiv.className = 'status-message error';
-                    resetSOSButton();
+                    console.log('Location error:', error);
+                    
+                    if (error.code === 1) {
+                        // User denied location - still send SOS without location
+                        try {
+                            const user = auth.currentUser;
+                            if (!user) throw new Error('Not logged in');
+
+                            const userDoc = await db.collection(USERS_COLLECTION).doc(user.uid).get();
+                            const userData = userDoc.data();
+
+                            const emergencyData = {
+                                userId: user.uid,
+                                userName: `${userData.firstName} ${userData.lastName}`,
+                                contactNumber: userData.contactNumber,
+                                groupId: userData.groupId,
+                                groupName: userData.groupName,
+                                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                                status: 'active'
+                            };
+
+                            const docRef = await db.collection(EMERGENCIES_COLLECTION).add(emergencyData);
+                            currentEmergencyId = docRef.id;
+
+                            isSOSActive = true;
+                            sosButton.classList.add('active');
+                            document.querySelector('.sos-instruction').innerHTML = '<span class="sos-engaged">ENGAGED</span><br><span class="sos-press-to-stop">PRESS TO STOP</span>';
+                            statusDiv.innerHTML = '✅ SOS Active - Walang location';
+                            locationNote.innerHTML = '📍 Hindi pinayagan ang location';
+                            
+                        } catch (firebaseError) {
+                            statusDiv.innerHTML = '❌ Nabigo ang SOS';
+                            statusDiv.className = 'status-message error';
+                            resetSOSButton();
+                        }
+                    } else {
+                        // Other location error
+                        locationNote.innerHTML = '📍 Hindi makuha ang location';
+                        statusDiv.innerHTML = '❌ Location error';
+                        statusDiv.className = 'status-message error';
+                    }
+                } finally {
+                    locationRequestInProgress = false;
                 }
+                
+                loadHistory();
             }
         });
     </script>
