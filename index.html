@@ -333,10 +333,24 @@
             margin-bottom: 5px;
             font-weight: 900;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            transition: all 0.2s ease;
         }
 
         .sos-button.active .sos-text {
             font-size: 46px;
+        }
+
+        .sos-engaged {
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            margin-bottom: 2px;
+        }
+
+        .sos-press-to-stop {
+            font-size: 14px;
+            font-weight: 500;
+            opacity: 0.9;
         }
 
         .sos-instruction {
@@ -344,10 +358,6 @@
             font-weight: 500;
             text-align: center;
             padding: 0 10px;
-        }
-
-        .sos-button.active .sos-instruction {
-            font-weight: bold;
         }
 
         .status-message {
@@ -377,6 +387,12 @@
             border: 1px solid #bee5eb;
         }
 
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+
         .emergency-history {
             margin-top: 30px;
             text-align: left;
@@ -394,6 +410,7 @@
             border-radius: 12px;
             margin-bottom: 10px;
             border-left: 4px solid #ff4d4d;
+            transition: all 0.2s ease;
         }
 
         .history-item.active {
@@ -402,11 +419,36 @@
             font-weight: 500;
         }
 
+        .history-item.completed {
+            border-left-color: #28a745;
+            background: #f0f0f0;
+            opacity: 0.8;
+        }
+
         .history-item small {
             color: #666;
             display: block;
             margin-top: 6px;
             font-size: 12px;
+        }
+
+        .history-status {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+
+        .status-active {
+            background: #ff4d4d;
+            color: white;
+        }
+
+        .status-completed {
+            background: #28a745;
+            color: white;
         }
 
         .hidden {
@@ -542,6 +584,7 @@
         let watchId = null;
         let currentEmergencyId = null;
         let currentUser = null;
+        let locationPermissionAsked = false;
 
         // Auth state observer
         auth.onAuthStateChanged(async (user) => {
@@ -551,6 +594,7 @@
                     if (userDoc.exists) {
                         currentUser = userDoc.data();
                         showSOSPage();
+                        checkActiveEmergency(user.uid);
                         loadHistory();
                     }
                 } catch (error) {
@@ -560,6 +604,32 @@
                 showLandingPage();
             }
         });
+
+        async function checkActiveEmergency(userId) {
+            try {
+                const snapshot = await db.collection(EMERGENCIES_COLLECTION)
+                    .where('userId', '==', userId)
+                    .where('status', '==', 'active')
+                    .limit(1)
+                    .get();
+                
+                if (!snapshot.empty) {
+                    const emergency = snapshot.docs[0];
+                    currentEmergencyId = emergency.id;
+                    isSOSActive = true;
+                    sosButton.classList.add('active');
+                    
+                    // Update button text
+                    const sosInstruction = document.querySelector('.sos-instruction');
+                    sosInstruction.innerHTML = '<span class="sos-engaged">ENGAGED</span><br><span class="sos-press-to-stop">PRESS TO STOP</span>';
+                    
+                    document.getElementById('sosStatus').innerHTML = '✅ Emergency active';
+                    document.getElementById('sosStatus').className = 'status-message success';
+                }
+            } catch (error) {
+                console.error('Error checking active emergency:', error);
+            }
+        }
 
         function showSOSPage() {
             document.getElementById('landingPage').style.display = 'none';
@@ -655,16 +725,19 @@
             }
         });
 
-        // Get location
+        // Get location - THIS triggers browser popup
         function getLocation() {
             return new Promise((resolve, reject) => {
                 if (!navigator.geolocation) {
                     reject(new Error('Geolocation not supported'));
                     return;
                 }
+                
+                locationPermissionAsked = true;
+                
                 navigator.geolocation.getCurrentPosition(resolve, reject, {
                     enableHighAccuracy: true,
-                    timeout: 10000,
+                    timeout: 30000,
                     maximumAge: 0
                 });
             });
@@ -727,9 +800,21 @@
                     const date = data.timestamp ? new Date(data.timestamp.seconds * 1000).toLocaleString() : 'Unknown';
                     const div = document.createElement('div');
                     div.className = 'history-item';
+                    
+                    if (data.status === 'active') {
+                        div.classList.add('active');
+                    } else if (data.status === 'completed') {
+                        div.classList.add('completed');
+                    }
+                    
                     if (doc.id === currentEmergencyId) div.classList.add('active');
+                    
+                    const statusText = data.status === 'active' ? 'Active' : 'Completed';
+                    const statusClass = data.status === 'active' ? 'status-active' : 'status-completed';
+                    
                     div.innerHTML = `
-                        <strong>🚨 Emergency</strong><br>
+                        <strong>🚨 Emergency</strong>
+                        <span class="history-status ${statusClass}">${statusText}</span><br>
                         ${data.location ? '📍 With location' : '📍 No location'}<br>
                         <small>📅 ${date}</small>
                     `;
@@ -746,7 +831,7 @@
 
         sosButton.addEventListener('click', async () => {
             if (isSOSActive) {
-                // Deactivate
+                // Just deactivate locally and update status on server
                 stopTracking();
                 
                 if (currentEmergencyId) {
@@ -755,21 +840,28 @@
                             status: 'completed',
                             endedAt: firebase.firestore.FieldValue.serverTimestamp()
                         });
+                        
+                        isSOSActive = false;
+                        currentEmergencyId = null;
+                        sosButton.classList.remove('active');
+                        
+                        // Reset button text
+                        const sosInstruction = document.querySelector('.sos-instruction');
+                        sosInstruction.innerHTML = 'Pindutin kung may emergency';
+                        
+                        statusDiv.innerHTML = '✅ Emergency completed';
+                        statusDiv.className = 'status-message success';
+                        loadHistory();
+                        
                     } catch (error) {
                         console.error('Deactivate error:', error);
+                        statusDiv.innerHTML = '❌ Failed to update status';
+                        statusDiv.className = 'status-message error';
                     }
                 }
                 
-                isSOSActive = false;
-                currentEmergencyId = null;
-                sosButton.classList.remove('active');
-                document.querySelector('.sos-instruction').textContent = 'Pindutin kung may emergency';
-                statusDiv.innerHTML = '✅ SOS Deactivated';
-                statusDiv.className = 'status-message success';
-                loadHistory();
-                
             } else {
-                // Activate
+                // Activate - send SOS immediately
                 statusDiv.innerHTML = '📍 Ina-activate...';
                 statusDiv.className = 'status-message info';
                 
@@ -781,7 +873,7 @@
                     const userDoc = await db.collection(USERS_COLLECTION).doc(user.uid).get();
                     const userData = userDoc.data();
 
-                    // Create emergency WITHOUT location first
+                    // Create emergency WITHOUT location first - this goes to server immediately
                     const emergencyData = {
                         userId: user.uid,
                         userName: `${userData.firstName} ${userData.lastName}`,
@@ -793,17 +885,21 @@
                         createdAt: new Date().toISOString()
                     };
 
-                    // Save to Firestore
+                    // Save to Firestore - SOS is sent!
                     const docRef = await db.collection(EMERGENCIES_COLLECTION).add(emergencyData);
                     currentEmergencyId = docRef.id;
 
-                    // Update UI
+                    // Update UI immediately
                     isSOSActive = true;
                     sosButton.classList.add('active');
-                    document.querySelector('.sos-instruction').textContent = 'PRESS TO STOP';
-                    statusDiv.innerHTML = '✅ SOS Activated - Getting location...';
+                    
+                    // Update button text with ENGAGED above PRESS TO STOP
+                    const sosInstruction = document.querySelector('.sos-instruction');
+                    sosInstruction.innerHTML = '<span class="sos-engaged">ENGAGED</span><br><span class="sos-press-to-stop">PRESS TO STOP</span>';
+                    
+                    statusDiv.innerHTML = '✅ SOS sent - Getting location...';
 
-                    // Try to get location
+                    // Try to get location - THIS triggers browser popup
                     try {
                         const position = await getLocation();
                         
@@ -816,14 +912,15 @@
                             hasLocation: true
                         });
                         
-                        statusDiv.innerHTML = '✅ SOS Activated - Location shared';
+                        statusDiv.innerHTML = '✅ SOS active - Location shared';
                         
                         // Start tracking
                         startTracking(currentEmergencyId);
                         
                     } catch (locError) {
-                        console.log('Location error:', locError);
-                        statusDiv.innerHTML = '✅ SOS Activated - No location';
+                        console.log('Location not available:', locError.message);
+                        // SOS still active even without location
+                        statusDiv.innerHTML = '✅ SOS active - No location';
                     }
                     
                     loadHistory();
@@ -833,6 +930,10 @@
                     statusDiv.innerHTML = '❌ Failed: ' + error.message;
                     statusDiv.className = 'status-message error';
                     sosButton.classList.remove('active');
+                    
+                    // Reset button text
+                    const sosInstruction = document.querySelector('.sos-instruction');
+                    sosInstruction.innerHTML = 'Pindutin kung may emergency';
                 }
             }
         });
