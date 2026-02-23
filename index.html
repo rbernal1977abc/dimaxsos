@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>DIMAX SOS - Emergency Response System</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 400px;
+            width: 100%;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+            animation: slideUp 0.5s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header {
+            background: linear-gradient(135deg, #ff4d4d 0%, #cc0000 100%);
+            padding: 30px 20px;
+            text-align: center;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: "🚨";
+            position: absolute;
+            right: -20px;
+            top: -20px;
+            font-size: 100px;
+            opacity: 0.1;
+            transform: rotate(15deg);
+        }
+
+        .logo-text {
+            font-size: 36px;
+            font-weight: 900;
+            display: block;
+            text-shadow: 3px 3px 0 rgba(0,0,0,0.2);
+            letter-spacing: 2px;
+        }
+
+        .logo-sub {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-top: 5px;
+            display: block;
+            font-style: italic;
+        }
+
+        .tagline {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-top: 10px;
+            display: block;
+            background: rgba(255,255,255,0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+        }
+
+        .content {
+            padding: 30px 20px;
+        }
+
+        .form-container {
+            transition: all 0.3s ease;
+        }
+
+        .form-container h2 {
+            color: #333;
+            margin-bottom: 25px;
+            font-size: 24px;
+            text-align: center;
+            position: relative;
+        }
+
+        .form-container h2::after {
+            content: "";
+            display: block;
+            width: 50px;
+            height: 3px;
+            background: #ff4d4d;
+            margin: 10px auto 0;
+            border-radius: 3px;
+        }
+
+        .filipino {
+            font-size: 12px;
+            color: #666;
+            font-style: italic;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #ff4d4d;
+        }
+
+        .hint {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+            display: block;
+        }
+
+        .btn-register {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #ff4d4d, #cc0000);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-register:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(255,77,77,0.3);
+        }
+
+        .sos-container {
+            text-align: center;
+        }
+
+        .sos-container h2 {
+            color: #333;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .sos-container h2::after {
+            content: "";
+            display: block;
+            width: 50px;
+            height: 3px;
+            background: #ff4d4d;
+            margin: 10px auto 0;
+            border-radius: 3px;
+        }
+
+        .user-info {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 4px solid #ff4d4d;
+        }
+
+        .user-info span:first-child {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .status-badge {
+            background: #4caf50;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+
+        .sos-button {
+            width: 220px;
+            height: 220px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #ff4d4d, #cc0000);
+            border: 8px solid #ff9999;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            animation: pulse 2s infinite;
+            margin: 20px auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 10px 30px rgba(255,68,68,0.4);
+            transition: transform 0.3s ease;
+        }
+
+        .sos-button:active {
+            transform: scale(0.95);
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(255,68,68,0.7);
+            }
+            70% {
+                transform: scale(1.05);
+                box-shadow: 0 0 0 20px rgba(255,68,68,0);
+            }
+            100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(255,68,68,0);
+            }
+        }
+
+        .sos-text {
+            font-size: 56px;
+            margin-bottom: 5px;
+            font-weight: 900;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .sos-sub {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .status-message {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 10px;
+            font-weight: 500;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .btn-logout {
+            width: 100%;
+            padding: 12px;
+            background: #333;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: background 0.3s ease;
+        }
+
+        .btn-logout:hover {
+            background: #555;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .message {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .emergency-history {
+            margin-top: 30px;
+            text-align: left;
+        }
+
+        .emergency-history h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .history-item {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            border-left: 4px solid #ff4d4d;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .history-item small {
+            color: #666;
+            display: block;
+            margin-top: 5px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            max-width: 300px;
+            text-align: center;
+            animation: modalSlide 0.3s ease;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+
+        @keyframes modalSlide {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-content h3 {
+            color: #ff4d4d;
+            margin-bottom: 15px;
+            font-size: 24px;
+        }
+
+        .modal-content p {
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .modal button {
+            margin: 10px;
+            padding: 10px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.2s ease;
+        }
+
+        .modal button:hover {
+            transform: translateY(-2px);
+        }
+
+        #confirmYes {
+            background: #ff4d4d;
+            color: white;
+        }
+
+        #confirmNo {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 15px 20px;
+            background: #1a1a2e;
+            color: white;
+            font-size: 12px;
+            border-top: 2px solid #ff4d4d;
+        }
+
+        .footer .developed-by {
+            color: #ff4d4d;
+            font-weight: bold;
+            font-size: 14px;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .footer .patent {
+            font-size: 10px;
+            opacity: 0.8;
+            display: block;
+        }
+
+        .footer .company {
+            color: #ff9999;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <span class="logo-text">DIMAX SOS</span>
+            <span class="logo-sub">Emergency Response System</span>
+            <span class="tagline">🇵🇭 Ligtas ang bawat Pilipino • Mabilis na Tugon</span>
+        </div>
+
+        <div class="content">
+            <!-- Registration Form -->
+            <div id="registrationForm" class="form-container">
+                <h2>Magparehistro</h2>
+                <form id="registerForm">
+                    <div class="form-group">
+                        <label>Pangalan <span class="filipino">(First Name)</span></label>
+                        <input type="text" id="firstName" placeholder="Juan" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Apelyido <span class="filipino">(Last Name)</span></label>
+                        <input type="text" id="lastName" placeholder="Dela Cruz" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Contact Number</label>
+                        <input type="tel" id="contactNumber" placeholder="09123456789" required pattern="[0-9]{11}" maxlength="11">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Registration Code <span class="filipino">(Admin Code)</span></label>
+                        <input type="text" id="regCode" placeholder="Enter DIMAX code" required>
+                        <small class="hint">Ipasok ang code na ibinigay ng inyong barangay</small>
+                    </div>
+                    
+                    <button type="submit" class="btn-register">Magparehistro</button>
+                </form>
+                <div id="registerMessage" class="message"></div>
+            </div>
+
+            <!-- SOS Section -->
+            <div id="sosSection" class="sos-container hidden">
+                <h2>DIMAX Emergency</h2>
+                <div class="user-info">
+                    <span id="displayName"></span>
+                    <span class="status-badge">✅ Naka-rehistro</span>
+                </div>
+                
+                <button id="sosButton" class="sos-button">
+                    <span class="sos-text">SOS</span>
+                    <span class="sos-sub">Pindutin kung may emergency</span>
+                </button>
+                
+                <div id="sosStatus" class="status-message"></div>
+                
+                <div id="emergencyHistory" class="emergency-history">
+                    <h3>📋 Kasaysayan ng Emergency</h3>
+                    <div id="historyList"></div>
+                </div>
+                
+                <button id="logoutBtn" class="btn-logout">Mag-logout</button>
+            </div>
+        </div>
+
+        <div class="footer">
+            <span class="developed-by">🚨 DIMAX SOS</span>
+            <span>Developed and Patented by <span class="company">RP8 & Dimax</span></span>
+            <span class="patent">Philippine Patent No. DIMAX-2024-001 • All Rights Reserved</span>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content">
+            <h3>⚠️ DIMAX ALERT</h3>
+            <p>Sigurado ka bang may emergency?</p>
+            <p><small>Ito ay magpapadala ng SOS signal sa DIMAX Response Team</small></p>
+            <button id="confirmYes">Oo, Mag-SOS</button>
+            <button id="confirmNo">Hindi</button>
+        </div>
+    </div>
+
+    <script>
+        // Firebase Configuration (Replace with your own Firebase credentials)
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // Collections
+        const USERS_COLLECTION = 'dimax_users';
+        const EMERGENCIES_COLLECTION = 'dimax_emergencies';
+        const CODES_COLLECTION = 'dimax_registration_codes';
+
+        // Check for existing session
+        let currentUser = JSON.parse(sessionStorage.getItem('dimaxUser'));
+
+        // Initialize default admin code if none exists
+        async function initializeAdminCode() {
+            try {
+                const codesSnapshot = await db.collection(CODES_COLLECTION).get();
+                if (codesSnapshot.empty) {
+                    await db.collection(CODES_COLLECTION).add({
+                        code: 'DIMAX2024',
+                        used: false,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        createdBy: 'system'
+                    });
+                    console.log('Default DIMAX code created: DIMAX2024');
+                }
+            } catch (error) {
+                console.error('Error initializing code:', error);
+            }
+        }
+
+        initializeAdminCode();
+
+        // Show SOS section if user is logged in
+        if (currentUser) {
+            showSOSSection(currentUser);
+            loadEmergencyHistory(currentUser.userId);
+        }
+
+        // Handle Registration
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const firstName = document.getElementById('firstName').value;
+            const lastName = document.getElementById('lastName').value;
+            const contactNumber = document.getElementById('contactNumber').value;
+            const regCode = document.getElementById('regCode').value;
+            const messageDiv = document.getElementById('registerMessage');
+            
+            // Validate contact number
+            if (!/^\d{11}$/.test(contactNumber)) {
+                messageDiv.innerHTML = '❌ Invalid contact number. Dapat 11 digits.';
+                messageDiv.className = 'message error';
+                return;
+            }
+            
+            try {
+                // Check if registration code is valid
+                const codeQuery = await db.collection(CODES_COLLECTION)
+                    .where('code', '==', regCode)
+                    .where('used', '==', false)
+                    .get();
+                
+                if (codeQuery.empty) {
+                    messageDiv.innerHTML = '❌ Invalid or expired DIMAX registration code. Please contact your barangay.';
+                    messageDiv.className = 'message error';
+                    return;
+                }
+                
+                // Generate user ID
+                const userId = 'DIMAX_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9).toUpperCase();
+                
+                // Save user to Firestore
+                await db.collection(USERS_COLLECTION).add({
+                    userId: userId,
+                    firstName: firstName,
+                    lastName: lastName,
+                    contactNumber: contactNumber,
+                    registeredAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    status: 'active'
+                });
+                
+                // Mark code as used
+                const codeDoc = codeQuery.docs[0];
+                await codeDoc.ref.update({
+                    used: true,
+                    usedBy: userId,
+                    usedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                // Store current user
+                currentUser = {
+                    userId: userId,
+                    firstName: firstName,
+                    lastName: lastName,
+                    contactNumber: contactNumber
+                };
+                sessionStorage.setItem('dimaxUser', JSON.stringify(currentUser));
+                
+                messageDiv.innerHTML = '✅ Registration successful! Welcome to DIMAX SOS.';
+                messageDiv.className = 'message success';
+                
+                // Switch to SOS view
+                showSOSSection(currentUser);
+                loadEmergencyHistory(userId);
+                
+            } catch (error) {
+                console.error('Registration error:', error);
+                messageDiv.innerHTML = '❌ Registration failed. Please try again.';
+                messageDiv.className = 'message error';
+            }
+        });
+
+        // Show SOS section
+        function showSOSSection(userData) {
+            document.getElementById('registrationForm').classList.add('hidden');
+            document.getElementById('sosSection').classList.remove('hidden');
+            document.getElementById('displayName').textContent = 
+                `👤 ${userData.firstName} ${userData.lastName}`;
+        }
+
+        // Get current position
+        function getCurrentPosition() {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    reject(new Error('Geolocation not supported'));
+                } else {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 0
+                    });
+                }
+            });
+        }
+
+        // Load emergency history
+        async function loadEmergencyHistory(userId) {
+            try {
+                const emergenciesSnapshot = await db.collection(EMERGENCIES_COLLECTION)
+                    .where('userId', '==', userId)
+                    .orderBy('timestamp', 'desc')
+                    .limit(10)
+                    .get();
+                
+                const historyList = document.getElementById('historyList');
+                historyList.innerHTML = '';
+                
+                if (emergenciesSnapshot.empty) {
+                    historyList.innerHTML = '<p class="info">Walang record ng emergency.</p>';
+                    return;
+                }
+                
+                emergenciesSnapshot.forEach(doc => {
+                    const data = doc.data();
+                    const date = data.timestamp ? new Date(data.timestamp.seconds * 1000).toLocaleString('en-PH') : 'Unknown date';
+                    
+                    const historyItem = document.createElement('div');
+                    historyItem.className = 'history-item';
+                    historyItem.innerHTML = `
+                        <strong>🚨 DIMAX Emergency</strong><br>
+                        📍 Location: ${data.location?.lat || 'Unknown'}, ${data.location?.lng || 'Unknown'}<br>
+                        <small>📅 ${date}</small>
+                    `;
+                    historyList.appendChild(historyItem);
+                });
+            } catch (error) {
+                console.error('Error loading history:', error);
+            }
+        }
+
+        // Handle SOS Button with confirmation
+        const sosButton = document.getElementById('sosButton');
+        const modal = document.getElementById('confirmModal');
+        const confirmYes = document.getElementById('confirmYes');
+        const confirmNo = document.getElementById('confirmNo');
+
+        sosButton.addEventListener('click', () => {
+            modal.style.display = 'flex';
+        });
+
+        confirmNo.addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+
+        confirmYes.addEventListener('click', async () => {
+            modal.style.display = 'none';
+            await sendSOS();
+        });
+
+        window.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
+
+        // Send SOS
+        async function sendSOS() {
+            const statusDiv = document.getElementById('sosStatus');
+            statusDiv.innerHTML = '📍 Kinukuha ang iyong lokasyon...';
+            statusDiv.className = 'status-message info';
+            
+            try {
+                // Get current user
+                if (!currentUser) {
+                    statusDiv.innerHTML = '❌ Please register first';
+                    statusDiv.className = 'status-message error';
+                    return;
+                }
+                
+                // Get GPS location
+                const position = await getCurrentPosition();
+                
+                // Create emergency record
+                const emergencyData = {
+                    userId: currentUser.userId,
+                    userName: `${currentUser.firstName} ${currentUser.lastName}`,
+                    contactNumber: currentUser.contactNumber,
+                    location: {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    },
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    status: 'active',
+                    googleMapsLink: `https://www.google.com/maps?q=${position.coords.latitude},${position.coords.longitude}`,
+                    system: 'DIMAX SOS'
+                };
+                
+                // Save to Firestore
+                await db.collection(EMERGENCIES_COLLECTION).add(emergencyData);
+                
+                statusDiv.innerHTML = '✅ DIMAX SOS Emergency sent! Response team is on the way. 📍 Location shared successfully.';
+                statusDiv.className = 'status-message success';
+                
+                // Refresh history
+                loadEmergencyHistory(currentUser.userId);
+                
+            } catch (error) {
+                console.error('SOS error:', error);
+                statusDiv.innerHTML = '❌ Failed to send SOS. Please enable location services and try again.';
+                statusDiv.className = 'status-message error';
+            }
+        }
+
+        // Handle Logout
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            sessionStorage.removeItem('dimaxUser');
+            currentUser = null;
+            document.getElementById('registrationForm').classList.remove('hidden');
+            document.getElementById('sosSection').classList.add('hidden');
+            document.getElementById('registerForm').reset();
+        });
+    </script>
+</body>
+</html>
