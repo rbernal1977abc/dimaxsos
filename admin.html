@@ -11,6 +11,9 @@
     <!-- Leaflet for Maps -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Leaflet Routing Machine for route tracking -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
     <style>
         /* All your existing styles remain exactly the same */
         * {
@@ -318,6 +321,7 @@
             display: flex;
             gap: 10px;
             margin-top: 10px;
+            flex-wrap: wrap;
         }
 
         .action-btn {
@@ -345,6 +349,16 @@
             color: white;
         }
 
+        .btn-view-location {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .btn-view-history {
+            background: #6c757d;
+            color: white;
+        }
+
         .btn-delete {
             background: #dc3545;
             color: white;
@@ -367,6 +381,8 @@
             padding: 15px;
             background: #f8f9fa;
             border-radius: 10px;
+            max-height: 300px;
+            overflow-y: auto;
         }
 
         .selected-info h4 {
@@ -396,6 +412,32 @@
             font-weight: bold;
             color: #333;
         }
+
+        .timeline-item {
+            padding: 10px;
+            border-left: 3px solid #17a2b8;
+            margin-bottom: 10px;
+            background: white;
+            border-radius: 5px;
+            font-size: 12px;
+        }
+
+        .timeline-time {
+            font-weight: bold;
+            color: #17a2b8;
+        }
+
+        .timeline-status {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 10px;
+            margin-left: 5px;
+        }
+
+        .status-active { background: #ff4d4d; color: white; }
+        .status-in-progress { background: #ffc107; color: #1a1a2e; }
+        .status-completed { background: #28a745; color: white; }
 
         .users-groups-container {
             display: grid;
@@ -1033,6 +1075,42 @@
             margin-top: 30px;
         }
 
+        .history-timeline {
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .route-info {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-size: 12px;
+        }
+
+        .route-stats {
+            display: flex;
+            gap: 15px;
+            justify-content: space-around;
+            margin-top: 10px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #17a2b8;
+        }
+
+        .stat-label-small {
+            font-size: 10px;
+            color: #666;
+        }
+
         @media (max-width: 768px) {
             .emergencies-grid,
             .users-groups-container {
@@ -1503,12 +1581,14 @@
         let currentUserRole = null;
         let map = null;
         let mapMarkers = {};
+        let routingControl = null;
         let selectedEmergencyId = null;
         let soundEnabled = true;
         let currentFilter = 'all';
         let selectedGroupId = null;
         let audio = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
         audio.loop = true;
+        let emergencyTimers = {};
 
         // Check authentication
         auth.onAuthStateChanged(async (user) => {
@@ -1619,6 +1699,14 @@
             }
         }
 
+        // Clear route from map
+        function clearRoute() {
+            if (routingControl) {
+                map.removeControl(routingControl);
+                routingControl = null;
+            }
+        }
+
         // Switch tabs
         window.switchTab = function(tab) {
             const tabs = document.querySelectorAll('.nav-tab');
@@ -1657,17 +1745,23 @@
             currentFilter = filter;
             document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
             event.target.classList.add('active');
+            
+            // Clear map and reload emergencies
+            clearMarkersAndRoute();
             loadEmergencies();
         };
 
-        // Toggle sound
-        window.toggleSound = function() {
-            soundEnabled = !soundEnabled;
-            document.getElementById('soundToggleBtn').textContent = soundEnabled ? '🔊 On' : '🔇 Off';
-            if (!soundEnabled) {
-                audio.pause();
+        // Clear markers and route
+        function clearMarkersAndRoute() {
+            // Clear markers
+            for (let id in mapMarkers) {
+                map.removeLayer(mapMarkers[id]);
             }
-        };
+            mapMarkers = {};
+            
+            // Clear route
+            clearRoute();
+        }
 
         // Play alert sound
         function playAlertSound() {
@@ -1698,27 +1792,38 @@
                 
                 if (filteredEmergencies.length === 0) {
                     emergenciesList.innerHTML = '<p style="text-align: center; padding: 20px;">No emergencies found</p>';
+                    
+                    // Clear map for completed emergencies when filter is not 'completed'
+                    if (currentFilter !== 'completed') {
+                        clearMarkersAndRoute();
+                        document.getElementById('selectedEmergencyInfo').innerHTML = '<h4>Select an emergency to view details</h4>';
+                    }
                     return;
                 }
                 
-                // Clear markers
-                for (let id in mapMarkers) {
-                    map.removeLayer(mapMarkers[id]);
+                // Clear markers only if we're not showing completed emergencies with history
+                if (currentFilter !== 'completed') {
+                    clearMarkersAndRoute();
                 }
-                mapMarkers = {};
                 
                 filteredEmergencies.forEach(emergency => {
                     const emergencyItem = createEmergencyItem(emergency);
                     emergenciesList.appendChild(emergencyItem);
                     
-                    // Add marker to map
-                    if (emergency.location) {
+                    // Add marker to map only for active and in-progress emergencies
+                    if (emergency.location && (emergency.status === 'active' || emergency.status === 'in-progress')) {
                         const marker = L.marker([emergency.location.lat, emergency.location.lng]).addTo(map);
+                        
+                        // Customize marker based on status
+                        let markerColor = emergency.status === 'active' ? '#ff4d4d' : '#ffc107';
+                        let statusText = emergency.status === 'active' ? 'ACTIVE' : 'IN PROGRESS';
+                        
                         marker.bindPopup(`
                             <b>${emergency.userName}</b><br>
-                            Status: ${emergency.status}<br>
+                            <span style="color: ${markerColor}; font-weight: bold;">${statusText}</span><br>
                             Time: ${new Date(emergency.timestamp?.seconds * 1000).toLocaleString()}
                         `);
+                        
                         marker.on('click', () => selectEmergency(emergency));
                         mapMarkers[emergency.id] = marker;
                     }
@@ -1728,6 +1833,7 @@
                 snapshot.docChanges().forEach(change => {
                     if (change.type === 'added' && change.doc.data().status === 'active') {
                         playAlertSound();
+                        loadStats();
                     }
                 });
             });
@@ -1743,17 +1849,21 @@
             
             let statusBadge = '';
             let operatorInfo = '';
+            let viewButton = '';
             
             switch(emergency.status) {
                 case 'active':
                     statusBadge = '<span class="emergency-badge badge-active">ACTIVE</span>';
+                    viewButton = `<button class="action-btn btn-view-location" onclick="selectEmergency(${JSON.stringify(emergency).replace(/"/g, '&quot;')}, event)">View Location</button>`;
                     break;
                 case 'in-progress':
                     statusBadge = '<span class="emergency-badge badge-in-progress">IN PROGRESS</span>';
                     operatorInfo = emergency.handledBy ? `<span class="operator-badge">👤 ${emergency.handledByName}</span>` : '';
+                    viewButton = `<button class="action-btn btn-view-location" onclick="selectEmergency(${JSON.stringify(emergency).replace(/"/g, '&quot;')}, event)">View Location</button>`;
                     break;
                 case 'completed':
                     statusBadge = '<span class="emergency-badge badge-completed">COMPLETED</span>';
+                    viewButton = `<button class="action-btn btn-view-history" onclick="viewEmergencyHistory('${emergency.id}', event)">View History</button>`;
                     break;
             }
             
@@ -1775,7 +1885,7 @@
                     ${emergency.status === 'in-progress' && emergency.handledBy === currentUser?.uid ? `
                         <button class="action-btn btn-complete" onclick="completeEmergency('${emergency.id}', event)">Complete</button>
                     ` : ''}
-                    <button class="action-btn btn-view" onclick="selectEmergency(${JSON.stringify(emergency).replace(/"/g, '&quot;')}, event)">View</button>
+                    ${viewButton}
                     ${currentUserRole === 'admin' ? `
                         <button class="action-btn btn-delete" onclick="deleteEmergency('${emergency.id}', event)">Delete</button>
                     ` : ''}
@@ -1783,6 +1893,116 @@
             `;
             
             return div;
+        }
+
+        // View emergency history
+        window.viewEmergencyHistory = async function(emergencyId, event) {
+            event.stopPropagation();
+            
+            try {
+                const doc = await db.collection(EMERGENCIES_COLLECTION).doc(emergencyId).get();
+                if (doc.exists) {
+                    const emergency = doc.data();
+                    emergency.id = doc.id;
+                    
+                    // Clear existing markers and route
+                    clearMarkersAndRoute();
+                    
+                    // Show the emergency location with history
+                    if (emergency.location) {
+                        // Add marker for final location
+                        const marker = L.marker([emergency.location.lat, emergency.location.lng]).addTo(map);
+                        marker.bindPopup(`
+                            <b>${emergency.userName}</b><br>
+                            <span style="color: #28a745; font-weight: bold;">COMPLETED</span><br>
+                            Completed: ${emergency.completedAt ? new Date(emergency.completedAt.seconds * 1000).toLocaleString() : 'N/A'}
+                        `);
+                        mapMarkers[emergency.id] = marker;
+                        
+                        // Center map on location
+                        map.setView([emergency.location.lat, emergency.location.lng], 14);
+                        
+                        // Show history timeline
+                        showEmergencyHistory(emergency);
+                    }
+                }
+            } catch (error) {
+                console.error('Error viewing history:', error);
+            }
+        };
+
+        // Show emergency history
+        function showEmergencyHistory(emergency) {
+            const infoDiv = document.getElementById('selectedEmergencyInfo');
+            
+            const receivedTime = emergency.timestamp ? new Date(emergency.timestamp.seconds * 1000) : null;
+            const handledTime = emergency.handledAt ? new Date(emergency.handledAt.seconds * 1000) : null;
+            const completedTime = emergency.completedAt ? new Date(emergency.completedAt.seconds * 1000) : null;
+            
+            // Calculate response time and total time
+            let responseTime = '';
+            let totalTime = '';
+            
+            if (receivedTime && handledTime) {
+                const responseMinutes = Math.round((handledTime - receivedTime) / 60000);
+                responseTime = `${responseMinutes} minutes`;
+            }
+            
+            if (receivedTime && completedTime) {
+                const totalMinutes = Math.round((completedTime - receivedTime) / 60000);
+                totalTime = `${totalMinutes} minutes`;
+            }
+            
+            infoDiv.innerHTML = `
+                <h4>Emergency History - ${emergency.userName}</h4>
+                <div class="history-timeline">
+                    <div class="timeline-item">
+                        <div class="timeline-time">📥 Received: ${receivedTime ? receivedTime.toLocaleString() : 'N/A'}</div>
+                        <span class="timeline-status status-active">ACTIVE</span>
+                    </div>
+                    ${handledTime ? `
+                        <div class="timeline-item">
+                            <div class="timeline-time">👤 Handled: ${handledTime.toLocaleString()}</div>
+                            <span class="timeline-status status-in-progress">IN PROGRESS</span>
+                            <div>By: ${emergency.handledByName || 'Unknown'} (${emergency.handledByRole || 'Operator'})</div>
+                        </div>
+                    ` : ''}
+                    ${completedTime ? `
+                        <div class="timeline-item">
+                            <div class="timeline-time">✅ Completed: ${completedTime.toLocaleString()}</div>
+                            <span class="timeline-status status-completed">COMPLETED</span>
+                        </div>
+                    ` : ''}
+                </div>
+                <div class="route-stats">
+                    <div class="stat-item">
+                        <div class="stat-value">${responseTime || 'N/A'}</div>
+                        <div class="stat-label-small">Response Time</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${totalTime || 'N/A'}</div>
+                        <div class="stat-label-small">Total Duration</div>
+                    </div>
+                </div>
+                <div class="info-grid" style="margin-top: 10px;">
+                    <div class="info-item">
+                        <span class="info-label">Name</span>
+                        <span class="info-value">${emergency.userName}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Contact</span>
+                        <span class="info-value">${emergency.contactNumber}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Group</span>
+                        <span class="info-value">${emergency.groupName || 'N/A'}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Location</span>
+                        <span class="info-value">${emergency.location?.lat.toFixed(4)}, ${emergency.location?.lng.toFixed(4)}</span>
+                    </div>
+                </div>
+            `;
         }
 
         // Select emergency
@@ -1797,49 +2017,53 @@
             });
             event?.target.closest('.emergency-item')?.classList.add('active');
             
-            // Center map
+            // Center map and show info for active/in-progress emergencies
             if (emergency.location && map) {
+                // Clear any existing route
+                clearRoute();
+                
+                // Center map on location
                 map.setView([emergency.location.lat, emergency.location.lng], 15);
+                
+                // Show info
+                const infoDiv = document.getElementById('selectedEmergencyInfo');
+                const time = emergency.timestamp ? new Date(emergency.timestamp.seconds * 1000).toLocaleString() : 'Just now';
+                
+                infoDiv.innerHTML = `
+                    <h4>Selected Emergency</h4>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Name</span>
+                            <span class="info-value">${emergency.userName}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Contact</span>
+                            <span class="info-value">${emergency.contactNumber}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Group</span>
+                            <span class="info-value">${emergency.groupName || 'N/A'}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Status</span>
+                            <span class="info-value">${emergency.status}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Time</span>
+                            <span class="info-value">${time}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Location</span>
+                            <span class="info-value">${emergency.location?.lat.toFixed(4)}, ${emergency.location?.lng.toFixed(4)}</span>
+                        </div>
+                    </div>
+                    ${emergency.handledBy ? `
+                        <div style="margin-top: 10px; padding: 10px; background: #e3f2fd; border-radius: 5px;">
+                            <strong>Handled by:</strong> ${emergency.handledByName} (${emergency.handledByRole})
+                        </div>
+                    ` : ''}
+                `;
             }
-            
-            // Show info
-            const infoDiv = document.getElementById('selectedEmergencyInfo');
-            const time = emergency.timestamp ? new Date(emergency.timestamp.seconds * 1000).toLocaleString() : 'Just now';
-            
-            infoDiv.innerHTML = `
-                <h4>Selected Emergency</h4>
-                <div class="info-grid">
-                    <div class="info-item">
-                        <span class="info-label">Name</span>
-                        <span class="info-value">${emergency.userName}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Contact</span>
-                        <span class="info-value">${emergency.contactNumber}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Group</span>
-                        <span class="info-value">${emergency.groupName || 'N/A'}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Status</span>
-                        <span class="info-value">${emergency.status}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Time</span>
-                        <span class="info-value">${time}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Location</span>
-                        <span class="info-value">${emergency.location?.lat.toFixed(4)}, ${emergency.location?.lng.toFixed(4)}</span>
-                    </div>
-                </div>
-                ${emergency.handledBy ? `
-                    <div style="margin-top: 10px; padding: 10px; background: #e3f2fd; border-radius: 5px;">
-                        <strong>Handled by:</strong> ${emergency.handledByName} (${emergency.handledByRole})
-                    </div>
-                ` : ''}
-            `;
         };
 
         // Handle emergency
@@ -1874,6 +2098,21 @@
                     completedAt: firebase.firestore.FieldValue.serverTimestamp(),
                     completedBy: currentUser.uid
                 });
+                
+                // Clear the marker for this emergency
+                if (mapMarkers[emergencyId]) {
+                    map.removeLayer(mapMarkers[emergencyId]);
+                    delete mapMarkers[emergencyId];
+                }
+                
+                // Clear route
+                clearRoute();
+                
+                // Clear selected info if this was the selected emergency
+                if (selectedEmergencyId === emergencyId) {
+                    document.getElementById('selectedEmergencyInfo').innerHTML = '<h4>Select an emergency to view details</h4>';
+                    selectedEmergencyId = null;
+                }
             } catch (error) {
                 alert('Error completing emergency: ' + error.message);
             }
@@ -1886,6 +2125,18 @@
             if (confirm('Are you sure you want to delete this emergency?')) {
                 try {
                     await db.collection(EMERGENCIES_COLLECTION).doc(emergencyId).delete();
+                    
+                    // Remove marker if exists
+                    if (mapMarkers[emergencyId]) {
+                        map.removeLayer(mapMarkers[emergencyId]);
+                        delete mapMarkers[emergencyId];
+                    }
+                    
+                    // Clear selected info if this was the selected emergency
+                    if (selectedEmergencyId === emergencyId) {
+                        document.getElementById('selectedEmergencyInfo').innerHTML = '<h4>Select an emergency to view details</h4>';
+                        selectedEmergencyId = null;
+                    }
                 } catch (error) {
                     alert('Error deleting emergency: ' + error.message);
                 }
@@ -2588,7 +2839,6 @@
                 createBtn.disabled = true;
                 
                 // Create the new admin using Firebase Admin SDK approach
-                // Note: This requires the user to be authenticated
                 const userCredential = await auth.createUserWithEmailAndPassword(email, password);
                 const newUser = userCredential.user;
                 
@@ -2674,6 +2924,8 @@
                             <th style="padding: 12px; text-align: left;">Location</th>
                             <th style="padding: 12px; text-align: left;">Status</th>
                             <th style="padding: 12px; text-align: left;">Handled By</th>
+                            <th style="padding: 12px; text-align: left;">Response Time</th>
+                            <th style="padding: 12px; text-align: left;">Total Duration</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -2682,6 +2934,20 @@
             snapshot.forEach(doc => {
                 const data = doc.data();
                 const date = data.timestamp ? new Date(data.timestamp.seconds * 1000).toLocaleString('en-PH') : 'Unknown';
+                
+                // Calculate times
+                let responseTime = 'N/A';
+                let totalDuration = 'N/A';
+                
+                if (data.timestamp && data.handledAt) {
+                    const responseMinutes = Math.round((data.handledAt.seconds - data.timestamp.seconds) / 60);
+                    responseTime = `${responseMinutes} min`;
+                }
+                
+                if (data.timestamp && data.completedAt) {
+                    const totalMinutes = Math.round((data.completedAt.seconds - data.timestamp.seconds) / 60);
+                    totalDuration = `${totalMinutes} min`;
+                }
                 
                 reportHTML += `
                     <tr>
@@ -2692,6 +2958,8 @@
                         <td style="padding: 12px; border-bottom: 1px solid #e0e0e0;">${data.location ? `${data.location.lat.toFixed(4)}, ${data.location.lng.toFixed(4)}` : 'N/A'}</td>
                         <td style="padding: 12px; border-bottom: 1px solid #e0e0e0;">${data.status || 'unknown'}</td>
                         <td style="padding: 12px; border-bottom: 1px solid #e0e0e0;">${data.handledByName || 'N/A'}</td>
+                        <td style="padding: 12px; border-bottom: 1px solid #e0e0e0;">${responseTime}</td>
+                        <td style="padding: 12px; border-bottom: 1px solid #e0e0e0;">${totalDuration}</td>
                     </tr>
                 `;
             });
