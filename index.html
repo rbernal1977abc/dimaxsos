@@ -407,17 +407,16 @@
             padding: 14px;
             border-radius: 12px;
             margin-bottom: 10px;
-            border-left: 4px solid #ff4d4d;
+            border-left: 4px solid;
             transition: all 0.2s ease;
         }
 
         .history-item.active {
             border-left-color: #ff4d4d;
             background: #fff3f3;
-            font-weight: 500;
         }
 
-        .history-item.user-disengaged {
+        .history-item.in-progress {
             border-left-color: #ffc107;
             background: #fff8e7;
         }
@@ -449,7 +448,7 @@
             color: white;
         }
 
-        .status-user-disengaged {
+        .status-in-progress {
             background: #ffc107;
             color: #333;
         }
@@ -467,6 +466,19 @@
             padding: 8px;
             background: #f8f9fa;
             border-radius: 8px;
+        }
+
+        .view-location-btn {
+            background: #17a2b8;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 8px;
+            width: 100%;
         }
 
         .hidden {
@@ -571,6 +583,11 @@
                     📍 I-share ang location para sa mas mabilis na rescue
                 </div>
                 
+                <!-- View Location Button (only shows when location is available) -->
+                <button id="viewLocationBtn" class="view-location-btn hidden" onclick="viewCurrentLocation()">
+                    📍 View My Location
+                </button>
+                
                 <div id="emergencyHistory" class="emergency-history">
                     <h3>📋 Kasaysayan ng Emergency</h3>
                     <div id="historyList"></div>
@@ -607,7 +624,7 @@
         let watchId = null;
         let currentEmergencyId = null;
         let currentUser = null;
-        let locationPermissionAsked = false;
+        let currentLocation = null;
 
         // Auth state observer
         auth.onAuthStateChanged(async (user) => {
@@ -632,7 +649,7 @@
             try {
                 const snapshot = await db.collection(EMERGENCIES_COLLECTION)
                     .where('userId', '==', userId)
-                    .where('status', '==', 'active')
+                    .where('status', 'in', ['active', 'in-progress'])
                     .limit(1)
                     .get();
                 
@@ -645,7 +662,9 @@
                     // Update button text
                     updateButtonText(true);
                     
-                    document.getElementById('sosStatus').innerHTML = '✅ Emergency active';
+                    const status = emergency.data().status;
+                    let statusText = status === 'active' ? 'Active' : 'Being Handled';
+                    document.getElementById('sosStatus').innerHTML = `✅ Emergency ${statusText}`;
                     document.getElementById('sosStatus').className = 'status-message success';
                 }
             } catch (error) {
@@ -764,9 +783,8 @@
                     return;
                 }
                 
-                locationPermissionAsked = true;
-                
-                // This will trigger the browser's permission popup
+                // This will trigger the browser's permission popup EVERY TIME
+                // For iOS Safari, we need to ensure it's called from a user gesture
                 navigator.geolocation.getCurrentPosition(resolve, reject, {
                     enableHighAccuracy: true,
                     timeout: 30000,
@@ -781,15 +799,20 @@
             
             watchId = navigator.geolocation.watchPosition(
                 async (position) => {
+                    currentLocation = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+                    
                     if (emergencyId) {
                         try {
                             await db.collection(EMERGENCIES_COLLECTION).doc(emergencyId).update({
-                                location: {
-                                    lat: position.coords.latitude,
-                                    lng: position.coords.longitude
-                                },
+                                location: currentLocation,
                                 lastUpdate: firebase.firestore.FieldValue.serverTimestamp()
                             });
+                            
+                            // Show view location button
+                            document.getElementById('viewLocationBtn').classList.remove('hidden');
                         } catch (error) {
                             console.error('Update error:', error);
                         }
@@ -807,6 +830,15 @@
                 watchId = null;
             }
         }
+
+        // View current location
+        window.viewCurrentLocation = function() {
+            if (currentLocation) {
+                window.open(`https://www.google.com/maps?q=${currentLocation.lat},${currentLocation.lng}`, '_blank');
+            } else {
+                alert('No location available');
+            }
+        };
 
         // Load history
         async function loadHistory() {
@@ -835,13 +867,11 @@
                     
                     if (data.status === 'active') {
                         div.classList.add('active');
-                    } else if (data.status === 'user_disengaged') {
-                        div.classList.add('user-disengaged');
+                    } else if (data.status === 'in-progress') {
+                        div.classList.add('in-progress');
                     } else if (data.status === 'completed') {
                         div.classList.add('completed');
                     }
-                    
-                    if (doc.id === currentEmergencyId) div.classList.add('active');
                     
                     let statusText = '';
                     let statusClass = '';
@@ -849,9 +879,9 @@
                     if (data.status === 'active') {
                         statusText = 'Active';
                         statusClass = 'status-active';
-                    } else if (data.status === 'user_disengaged') {
-                        statusText = 'User Disengaged';
-                        statusClass = 'status-user-disengaged';
+                    } else if (data.status === 'in-progress') {
+                        statusText = 'Being Handled';
+                        statusClass = 'status-in-progress';
                     } else if (data.status === 'completed') {
                         statusText = 'Completed';
                         statusClass = 'status-completed';
@@ -877,34 +907,18 @@
 
         sosButton.addEventListener('click', async () => {
             if (isSOSActive) {
-                // User disengaged - update status but keep in database
+                // User pressed STOP - just stop tracking but DON'T change status
                 stopTracking();
                 
-                if (currentEmergencyId) {
-                    try {
-                        await db.collection(EMERGENCIES_COLLECTION).doc(currentEmergencyId).update({
-                            status: 'user_disengaged',
-                            disengagedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                            disengagedBy: 'user'
-                        });
-                        
-                        isSOSActive = false;
-                        currentEmergencyId = null;
-                        sosButton.classList.remove('active');
-                        
-                        // Reset button text
-                        updateButtonText(false);
-                        
-                        statusDiv.innerHTML = '✅ Emergency disengaged';
-                        statusDiv.className = 'status-message info';
-                        loadHistory();
-                        
-                    } catch (error) {
-                        console.error('Disengage error:', error);
-                        statusDiv.innerHTML = '❌ Failed to update status';
-                        statusDiv.className = 'status-message error';
-                    }
-                }
+                isSOSActive = false;
+                currentEmergencyId = null;
+                sosButton.classList.remove('active');
+                
+                // Reset button text
+                updateButtonText(false);
+                
+                statusDiv.innerHTML = '✅ Tracking stopped - Emergency remains active';
+                statusDiv.className = 'status-message info';
                 
             } else {
                 // Activate - send SOS immediately
@@ -927,7 +941,7 @@
                         groupId: userData.groupId,
                         groupName: userData.groupName,
                         timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                        status: 'active',
+                        status: 'active', // Always starts as active
                         createdAt: new Date().toISOString()
                     };
 
@@ -944,30 +958,35 @@
                     
                     statusDiv.innerHTML = '✅ SOS sent - Binabasa ang lokasyon...';
 
-                    // Try to get location - THIS triggers browser popup every time
+                    // Try to get location - THIS triggers browser popup EVERY TIME
                     try {
-                        // This will always trigger the browser's permission popup
                         permissionNote.innerHTML = '📍 Hinihingi ang permission para sa location...';
                         
+                        // This will trigger the browser's permission popup
                         const position = await requestLocation();
+                        
+                        currentLocation = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
                         
                         // Update with location
                         await db.collection(EMERGENCIES_COLLECTION).doc(currentEmergencyId).update({
-                            location: {
-                                lat: position.coords.latitude,
-                                lng: position.coords.longitude
-                            },
+                            location: currentLocation,
                             hasLocation: true
                         });
                         
                         statusDiv.innerHTML = '✅ SOS active - Location shared';
                         permissionNote.innerHTML = '📍 Location shared - Salamat!';
                         
+                        // Show view location button
+                        document.getElementById('viewLocationBtn').classList.remove('hidden');
+                        
                         // Start tracking
                         startTracking(currentEmergencyId);
                         
                     } catch (locError) {
-                        console.log('Location not available:', locError.message);
+                        console.log('Location not available:', locError);
                         
                         if (locError.code === 1) {
                             // Permission denied
@@ -1011,6 +1030,37 @@
                     permissionNote.innerHTML = '📍 Location blocked - Enable sa settings';
                 }
             });
+        }
+
+        // Listen for status changes from server
+        if (auth.currentUser) {
+            db.collection(EMERGENCIES_COLLECTION)
+                .where('userId', '==', auth.currentUser?.uid)
+                .where('status', 'in', ['active', 'in-progress'])
+                .onSnapshot((snapshot) => {
+                    snapshot.docChanges().forEach((change) => {
+                        if (change.type === 'modified') {
+                            const data = change.doc.data();
+                            if (data.status === 'in-progress') {
+                                statusDiv.innerHTML = '🟡 Emergency is now being handled by operator';
+                                statusDiv.className = 'status-message warning';
+                            } else if (data.status === 'completed') {
+                                statusDiv.innerHTML = '✅ Emergency has been resolved';
+                                statusDiv.className = 'status-message success';
+                                
+                                // If current emergency is completed, reset button
+                                if (change.doc.id === currentEmergencyId) {
+                                    isSOSActive = false;
+                                    currentEmergencyId = null;
+                                    sosButton.classList.remove('active');
+                                    updateButtonText(false);
+                                    stopTracking();
+                                }
+                            }
+                            loadHistory();
+                        }
+                    });
+                });
         }
     </script>
 </body>
