@@ -455,37 +455,35 @@
             font-size: 12px;
         }
 
-        .permission-prompt {
-            background: #e3f2fd;
-            color: #0d47a1;
-            padding: 12px;
-            border-radius: 8px;
-            font-size: 14px;
-            margin-bottom: 15px;
-            text-align: center;
-            border: 1px solid #bbdefb;
-        }
-
-        .permission-prompt button {
-            background: #ff4d4d;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 5px;
-            margin-top: 8px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
-        .permission-warning {
-            background: #fff3cd;
-            color: #856404;
-            padding: 12px;
+        /* Location status indicator */
+        .location-status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
             border-radius: 8px;
             font-size: 13px;
-            margin-bottom: 15px;
-            text-align: center;
-            border: 1px solid #ffeeba;
+        }
+
+        .location-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #6c757d;
+        }
+
+        .location-dot.active {
+            background: #28a745;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0.4; }
+            100% { opacity: 1; }
         }
 
         .hidden {
@@ -598,15 +596,10 @@
                     <div class="user-group" id="groupBadge"></div>
                 </div>
                 
-                <!-- Location permission prompt -->
-                <div id="permissionPrompt" class="permission-prompt hidden">
-                    <span>📍 DIMAX needs your location for emergency services</span>
-                    <button onclick="requestLocationPermission()">Allow Location Access</button>
-                </div>
-                
-                <!-- Location permission warning -->
-                <div id="permissionWarning" class="permission-warning hidden">
-                    ⚠️ Location services are disabled. SOS will still be sent but without your location.
+                <!-- Location Status -->
+                <div id="locationStatus" class="location-status hidden">
+                    <span class="location-dot" id="locationDot"></span>
+                    <span id="locationText">Waiting for location...</span>
                 </div>
                 
                 <div class="sos-button-container">
@@ -659,8 +652,8 @@
         let isSOSActive = false;
         let watchPositionId = null;
         let currentEmergencyId = null;
-        let hasLocationPermission = false;
-        let locationPermissionDenied = false;
+        let currentUserData = null;
+        let lastLocation = null;
 
         // Check authentication state
         auth.onAuthStateChanged(async (user) => {
@@ -668,10 +661,9 @@
                 // User is logged in - show SOS page
                 const userDoc = await db.collection(USERS_COLLECTION).doc(user.uid).get();
                 if (userDoc.exists) {
-                    const userData = userDoc.data();
-                    showSOSPage(userData);
+                    currentUserData = userDoc.data();
+                    showSOSPage(currentUserData);
                     loadEmergencyHistory(user.uid);
-                    checkLocationPermission();
                 }
             } else {
                 // User is logged out - show landing page
@@ -696,78 +688,26 @@
             document.getElementById('sosPage').classList.remove('active');
         }
 
-        // Check location permission
-        function checkLocationPermission() {
-            if (!navigator.geolocation) {
-                showPermissionWarning('Geolocation is not supported by your browser');
-                return;
-            }
+        // Update location status
+        function updateLocationStatus(active, message) {
+            const statusDiv = document.getElementById('locationStatus');
+            const dot = document.getElementById('locationDot');
+            const text = document.getElementById('locationText');
             
-            // Try to get permission status
-            if (navigator.permissions && navigator.permissions.query) {
-                navigator.permissions.query({ name: 'geolocation' }).then(result => {
-                    if (result.state === 'granted') {
-                        hasLocationPermission = true;
-                        locationPermissionDenied = false;
-                        hidePermissionPrompt();
-                    } else if (result.state === 'prompt') {
-                        // Show prompt to ask for permission
-                        showPermissionPrompt();
-                    } else if (result.state === 'denied') {
-                        locationPermissionDenied = true;
-                        showPermissionWarning('Location access denied. SOS will be sent without location.');
-                    }
-                });
+            statusDiv.classList.remove('hidden');
+            
+            if (active) {
+                dot.className = 'location-dot active';
+                text.textContent = message || 'Sharing location';
             } else {
-                // Fallback for older browsers - show prompt
-                showPermissionPrompt();
+                dot.className = 'location-dot';
+                text.textContent = message || 'Location not available';
             }
         }
 
-        // Request location permission
-        window.requestLocationPermission = function() {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    // Permission granted
-                    hasLocationPermission = true;
-                    locationPermissionDenied = false;
-                    hidePermissionPrompt();
-                    showStatusMessage('✅ Location access granted', 'success');
-                },
-                (error) => {
-                    // Permission denied
-                    locationPermissionDenied = true;
-                    hidePermissionPrompt();
-                    showPermissionWarning('Location access denied. SOS will be sent without location.');
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 0
-                }
-            );
-        };
-
-        function showPermissionPrompt() {
-            document.getElementById('permissionPrompt').classList.remove('hidden');
-            document.getElementById('permissionWarning').classList.add('hidden');
-        }
-
-        function hidePermissionPrompt() {
-            document.getElementById('permissionPrompt').classList.add('hidden');
-        }
-
-        function showPermissionWarning(message) {
-            const warning = document.getElementById('permissionWarning');
-            warning.textContent = `⚠️ ${message}`;
-            warning.classList.remove('hidden');
-            document.getElementById('permissionPrompt').classList.add('hidden');
-        }
-
-        function showStatusMessage(message, type) {
-            const statusDiv = document.getElementById('sosStatus');
-            statusDiv.innerHTML = message;
-            statusDiv.className = `status-message ${type}`;
+        // Hide location status
+        function hideLocationStatus() {
+            document.getElementById('locationStatus').classList.add('hidden');
         }
 
         // Switch between login and register tabs
@@ -904,7 +844,7 @@
             }
         });
 
-        // Get current position
+        // Get current position with browser prompt
         function getCurrentPosition() {
             return new Promise((resolve, reject) => {
                 if (!navigator.geolocation) {
@@ -912,9 +852,10 @@
                     return;
                 }
                 
+                // This will trigger the browser's permission popup
                 navigator.geolocation.getCurrentPosition(resolve, reject, {
                     enableHighAccuracy: true,
-                    timeout: 10000,
+                    timeout: 30000,
                     maximumAge: 0
                 });
             });
@@ -928,15 +869,17 @@
                 async (position) => {
                     // Update emergency location in real-time
                     if (emergencyId) {
+                        lastLocation = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
+                        
                         try {
                             await db.collection(EMERGENCIES_COLLECTION).doc(emergencyId).update({
-                                location: {
-                                    lat: position.coords.latitude,
-                                    lng: position.coords.longitude
-                                },
+                                location: lastLocation,
                                 lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
                             });
-                            console.log('Location updated');
+                            updateLocationStatus(true, `📍 Tracking: ${lastLocation.lat.toFixed(4)}, ${lastLocation.lng.toFixed(4)}`);
                         } catch (error) {
                             console.error('Error updating location:', error);
                         }
@@ -944,6 +887,7 @@
                 },
                 (error) => {
                     console.error('Watch position error:', error);
+                    updateLocationStatus(false, 'Location tracking failed');
                 },
                 {
                     enableHighAccuracy: true,
@@ -1038,31 +982,7 @@
                 const userDoc = await db.collection(USERS_COLLECTION).doc(user.uid).get();
                 const userData = userDoc.data();
                 
-                let location = null;
-                let locationStatus = 'without location';
-                
-                // Try to get location if not previously denied
-                if (!locationPermissionDenied) {
-                    try {
-                        const position = await getCurrentPosition();
-                        location = {
-                            lat: position.coords.latitude,
-                            lng: position.coords.longitude
-                        };
-                        hasLocationPermission = true;
-                        locationStatus = 'with location';
-                        hidePermissionPrompt();
-                    } catch (locationError) {
-                        console.warn('Location error:', locationError);
-                        locationPermissionDenied = true;
-                        showPermissionWarning('Unable to get your location. SOS sent without location.');
-                        locationStatus = 'without location';
-                    }
-                } else {
-                    locationStatus = 'without location (permission denied)';
-                }
-                
-                // Create emergency record
+                // Create base emergency record without location first
                 const emergencyData = {
                     userId: user.uid,
                     userName: `${userData.firstName} ${userData.lastName}`,
@@ -1072,17 +992,10 @@
                     timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                     status: 'active',
                     system: 'DIMAX SOS',
-                    isActive: true,
-                    hasLocation: !!location
+                    isActive: true
                 };
                 
-                // Add location if available
-                if (location) {
-                    emergencyData.location = location;
-                    emergencyData.googleMapsLink = `https://www.google.com/maps?q=${location.lat},${location.lng}`;
-                }
-                
-                // Save to Firestore
+                // Save to Firestore (without location initially)
                 const emergencyRef = await db.collection(EMERGENCIES_COLLECTION).add(emergencyData);
                 currentEmergencyId = emergencyRef.id;
                 
@@ -1091,12 +1004,34 @@
                 sosButton.classList.add('active');
                 document.querySelector('.sos-instruction').textContent = 'ENGAGED - Press to stop';
                 
-                statusDiv.innerHTML = `✅ SOS Activated - ${locationStatus}`;
+                statusDiv.innerHTML = '✅ SOS Activated - Getting location...';
                 statusDiv.className = 'status-message success';
                 
-                // Start continuous location tracking if we have permission
-                if (location && !locationPermissionDenied) {
+                // Try to get location (this will trigger browser prompt)
+                try {
+                    const position = await getCurrentPosition();
+                    lastLocation = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+                    
+                    // Update emergency with location
+                    await db.collection(EMERGENCIES_COLLECTION).doc(currentEmergencyId).update({
+                        location: lastLocation,
+                        googleMapsLink: `https://www.google.com/maps?q=${lastLocation.lat},${lastLocation.lng}`,
+                        hasLocation: true
+                    });
+                    
+                    statusDiv.innerHTML = '✅ SOS Activated - Location shared';
+                    updateLocationStatus(true, `📍 Tracking: ${lastLocation.lat.toFixed(4)}, ${lastLocation.lng.toFixed(4)}`);
+                    
+                    // Start continuous tracking
                     startWatchingPosition(currentEmergencyId);
+                    
+                } catch (locationError) {
+                    console.warn('Location error:', locationError);
+                    statusDiv.innerHTML = '✅ SOS Activated - Location unavailable';
+                    updateLocationStatus(false, '📍 Location not available');
                 }
                 
                 // Refresh history
@@ -1107,6 +1042,7 @@
                 statusDiv.innerHTML = '❌ Failed to activate SOS. Please try again.';
                 statusDiv.className = 'status-message error';
                 sosButton.classList.remove('active');
+                hideLocationStatus();
             }
         }
 
@@ -1135,6 +1071,9 @@
                 
                 statusDiv.innerHTML = '✅ SOS Deactivated';
                 statusDiv.className = 'status-message info';
+                
+                // Hide location status
+                hideLocationStatus();
                 
                 // Refresh history
                 const user = auth.currentUser;
