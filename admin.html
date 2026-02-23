@@ -26,8 +26,8 @@
 
         /* Login Styles */
         .login-container {
-            max-width: 400px;
-            margin: 100px auto;
+            max-width: 500px;
+            margin: 50px auto;
             background: white;
             border-radius: 20px;
             padding: 40px;
@@ -40,40 +40,104 @@
             text-align: center;
         }
 
-        .setup-panel {
-            max-width: 400px;
-            margin: 20px auto;
-            background: #e3f2fd;
+        /* Rules Panel */
+        .rules-panel {
+            background: #fff3cd;
+            border: 1px solid #ffeeba;
             border-radius: 10px;
             padding: 20px;
-            border-left: 4px solid #2196f3;
+            margin-bottom: 20px;
         }
 
-        .setup-panel h3 {
-            color: #0d47a1;
-            margin-bottom: 10px;
-            font-size: 16px;
+        .rules-panel h3 {
+            color: #856404;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .rules-code {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            margin-bottom: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .emergency-setup {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .emergency-setup h3 {
+            color: #155724;
+            margin-bottom: 15px;
         }
 
         .setup-btn {
-            background: #2196f3;
+            background: #28a745;
             color: white;
             border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
+            padding: 12px 24px;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 16px;
+            font-weight: bold;
             width: 100%;
             margin-bottom: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .setup-btn:hover {
+            background: #218838;
+            transform: translateY(-2px);
+        }
+
+        .setup-btn.danger {
+            background: #dc3545;
+        }
+
+        .setup-btn.danger:hover {
+            background: #c82333;
         }
 
         .setup-info {
             background: white;
-            padding: 10px;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+
+        .warning-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin-bottom: 20px;
             border-radius: 5px;
-            font-size: 12px;
-            margin-top: 10px;
-            border: 1px solid #bbdefb;
+        }
+
+        .step-box {
+            background: #e9ecef;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+        }
+
+        .step-box ol {
+            margin-left: 20px;
+            color: #495057;
+        }
+
+        .step-box li {
+            margin-bottom: 8px;
         }
 
         /* Dashboard Layout */
@@ -793,14 +857,76 @@
     <div id="loginContainer" class="login-container">
         <h2>DIMAX Admin Login</h2>
         
-        <!-- Setup Panel (will appear if first time or if admin document missing) -->
-        <div id="setupPanel" class="setup-panel" style="display: none;">
-            <h3>🔧 First Time Setup</h3>
-            <p style="font-size: 13px; margin-bottom: 10px;">Your admin account exists but needs to be configured in Firestore.</p>
-            <button id="setupAdminBtn" class="setup-btn" onclick="setupAdminAccount()">Setup My Admin Account</button>
-            <div id="setupStatus" class="setup-info"></div>
+        <!-- Security Rules Issue Panel -->
+        <div id="rulesIssuePanel" class="rules-panel" style="display: none;">
+            <h3>⚠️ Firestore Security Rules Issue Detected</h3>
+            <p style="margin-bottom: 15px;">Your Firebase security rules are blocking admin access. You need to update your Firestore rules.</p>
+            
+            <div class="step-box">
+                <h4>Step 1: Copy these security rules</h4>
+                <div class="rules-code">
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow public read access for emergencies (for map display)
+    match /emergencies/{document} {
+      allow read: if true;
+      allow write: if request.auth != null && 
+        (get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'admin' ||
+         get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'operator');
+    }
+    
+    // Allow users to read/write their own data
+    match /registered_users/{userId} {
+      allow read: if request.auth != null && 
+        (request.auth.uid == userId ||
+         get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'admin');
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Admin-only collections
+    match /admins/{adminId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    match /registration_codes/{document} {
+      allow read, write: if request.auth != null && 
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    match /groups/{document} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'admin';
+    }
+  }
+}
+                </div>
+            </div>
+            
+            <div class="step-box">
+                <h4>Step 2: Go to Firebase Console</h4>
+                <ol>
+                    <li>Open <a href="https://console.firebase.google.com" target="_blank">Firebase Console</a></li>
+                    <li>Select your project: <strong>dimax-sos</strong></li>
+                    <li>Go to <strong>Firestore Database</strong> in left menu</li>
+                    <li>Click the <strong>Rules</strong> tab</li>
+                    <li>Replace existing rules with the rules above</li>
+                    <li>Click <strong>Publish</strong></li>
+                </ol>
+            </div>
+            
+            <div class="step-box">
+                <h4>Step 3: Create your admin document (Emergency Fix)</h4>
+                <p>After updating rules, use this emergency button to create your admin document:</p>
+                <button id="emergencyCreateAdminBtn" class="setup-btn" onclick="emergencyCreateAdmin()">🚨 Create Admin Document (Emergency Fix)</button>
+                <div id="emergencyStatus" class="setup-info"></div>
+            </div>
         </div>
 
+        <!-- Normal Login Form -->
         <form id="adminLoginForm">
             <div class="form-group" style="margin-bottom: 20px;">
                 <label>Email</label>
@@ -1038,28 +1164,97 @@
         let audio = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
         audio.loop = true;
 
+        // Emergency function to create admin document bypassing rules
+        window.emergencyCreateAdmin = async function() {
+            const statusDiv = document.getElementById('emergencyStatus');
+            statusDiv.innerHTML = 'Attempting to create admin document...';
+            statusDiv.className = 'setup-info';
+            
+            try {
+                if (!currentUser) {
+                    // Try to get current user from auth
+                    currentUser = auth.currentUser;
+                    if (!currentUser) {
+                        throw new Error('Please login first');
+                    }
+                }
+                
+                // Try different approaches
+                const approaches = [
+                    // Approach 1: Direct set with no auth check
+                    async () => {
+                        await db.collection(ADMINS_COLLECTION).doc(currentUser.uid).set({
+                            userId: currentUser.uid,
+                            firstName: currentUser.email.split('@')[0],
+                            lastName: 'Admin',
+                            email: currentUser.email,
+                            role: 'admin',
+                            createdAt: new Date().toISOString(),
+                            emergencyCreated: true
+                        });
+                    },
+                    
+                    // Approach 2: Try with merge
+                    async () => {
+                        await db.collection(ADMINS_COLLECTION).doc(currentUser.uid).set({
+                            userId: currentUser.uid,
+                            firstName: currentUser.email.split('@')[0],
+                            lastName: 'Admin',
+                            email: currentUser.email,
+                            role: 'admin',
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        }, { merge: true });
+                    }
+                ];
+                
+                let success = false;
+                let lastError = null;
+                
+                for (const approach of approaches) {
+                    try {
+                        await approach();
+                        success = true;
+                        break;
+                    } catch (e) {
+                        lastError = e;
+                        console.log('Approach failed:', e);
+                    }
+                }
+                
+                if (success) {
+                    statusDiv.innerHTML = '✅ Admin document created successfully! Refreshing page...';
+                    statusDiv.className = 'setup-info success';
+                    setTimeout(() => window.location.reload(), 2000);
+                } else {
+                    throw lastError || new Error('All approaches failed');
+                }
+                
+            } catch (error) {
+                console.error('Emergency create error:', error);
+                statusDiv.innerHTML = `❌ Failed: ${error.message}<br><br>Please update the security rules first using the rules above.`;
+                statusDiv.className = 'setup-info error';
+            }
+        };
+
         // Check authentication
         auth.onAuthStateChanged(async (user) => {
             if (user) {
-                // Check if user is admin/operator
+                currentUser = user;
+                
                 try {
+                    // Try to check if admin exists
                     const adminDoc = await db.collection(ADMINS_COLLECTION).doc(user.uid).get();
                     
                     if (adminDoc.exists) {
-                        // Admin exists in Firestore - proceed to dashboard
-                        currentUser = user;
+                        // Admin exists - proceed to dashboard
                         currentUserRole = adminDoc.data().role;
                         
-                        // Show dashboard
                         document.getElementById('loginContainer').style.display = 'none';
                         document.getElementById('dashboard').style.display = 'block';
                         document.getElementById('adminName').textContent = adminDoc.data().firstName + ' ' + adminDoc.data().lastName;
                         document.getElementById('adminRole').textContent = currentUserRole === 'admin' ? 'Super Admin' : 'Operator';
                         
-                        // Initialize map
                         initMap();
-                        
-                        // Load all data
                         loadEmergencies();
                         loadStats();
                         loadUsers();
@@ -1067,74 +1262,32 @@
                         loadAdmins();
                         loadGroups();
                         loadFilters();
-                        
-                        // Setup realtime listener
                         setupRealtimeListener();
                     } else {
-                        // Admin authenticated but not in Firestore - show setup panel
-                        document.getElementById('setupPanel').style.display = 'block';
-                        document.getElementById('adminLoginMessage').innerHTML = 'Your admin account needs setup. Click the button below to complete setup.';
+                        // Admin doesn't exist - show rules panel
+                        document.getElementById('rulesIssuePanel').style.display = 'block';
+                        document.getElementById('adminLoginMessage').innerHTML = 'Admin account exists but not in Firestore. Use the emergency fix below.';
                         document.getElementById('adminLoginMessage').className = 'message info';
-                        
-                        // Store user for setup
-                        currentUser = user;
                     }
                 } catch (error) {
-                    console.error('Error checking admin status:', error);
-                    showLoginMessage('Error checking admin status: ' + error.message, 'error');
+                    // Permission error - show rules panel
+                    console.error('Error checking admin:', error);
+                    
+                    if (error.code === 'permission-denied') {
+                        document.getElementById('rulesIssuePanel').style.display = 'block';
+                        document.getElementById('adminLoginMessage').innerHTML = '⚠️ Firestore permission denied. Please update your security rules using the instructions below.';
+                        document.getElementById('adminLoginMessage').className = 'message error';
+                    } else {
+                        document.getElementById('adminLoginMessage').innerHTML = 'Error: ' + error.message;
+                        document.getElementById('adminLoginMessage').className = 'message error';
+                    }
                 }
             } else {
                 document.getElementById('loginContainer').style.display = 'block';
                 document.getElementById('dashboard').style.display = 'none';
-                document.getElementById('setupPanel').style.display = 'none';
+                document.getElementById('rulesIssuePanel').style.display = 'none';
             }
         });
-
-        // Setup admin account function
-        window.setupAdminAccount = async function() {
-            const setupBtn = document.getElementById('setupAdminBtn');
-            const setupStatus = document.getElementById('setupStatus');
-            
-            setupBtn.disabled = true;
-            setupStatus.innerHTML = 'Setting up your admin account...';
-            
-            try {
-                if (!currentUser) {
-                    throw new Error('No user logged in');
-                }
-                
-                // Get user email
-                const email = currentUser.email;
-                
-                // Split email for first name
-                const firstName = email.split('@')[0] || 'Admin';
-                
-                // Create admin document in Firestore
-                await db.collection(ADMINS_COLLECTION).doc(currentUser.uid).set({
-                    userId: currentUser.uid,
-                    firstName: firstName,
-                    lastName: 'User',
-                    email: email,
-                    role: 'admin', // Give full admin rights
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                
-                setupStatus.innerHTML = '✅ Admin account setup complete! Refreshing...';
-                setupStatus.className = 'setup-info success';
-                
-                // Reload to show dashboard
-                setTimeout(() => {
-                    window.location.reload();
-                }, 2000);
-                
-            } catch (error) {
-                console.error('Setup error:', error);
-                setupStatus.innerHTML = '❌ Error: ' + error.message;
-                setupStatus.className = 'setup-info error';
-                setupBtn.disabled = false;
-            }
-        };
 
         // Login handler
         document.getElementById('adminLoginForm').addEventListener('submit', async (e) => {
@@ -1442,15 +1595,19 @@
 
         // Load users
         async function loadUsers() {
-            const snapshot = await db.collection(USERS_COLLECTION).get();
-            const usersGrid = document.getElementById('usersGrid');
-            usersGrid.innerHTML = '';
-            
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                const userCard = createUserCard(data, doc.id);
-                usersGrid.appendChild(userCard);
-            });
+            try {
+                const snapshot = await db.collection(USERS_COLLECTION).get();
+                const usersGrid = document.getElementById('usersGrid');
+                usersGrid.innerHTML = '';
+                
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const userCard = createUserCard(data, doc.id);
+                    usersGrid.appendChild(userCard);
+                });
+            } catch (error) {
+                console.error('Error loading users:', error);
+            }
         }
 
         // Create user card
@@ -1524,31 +1681,35 @@
 
         // Load codes
         async function loadCodes() {
-            const snapshot = await db.collection(CODES_COLLECTION).orderBy('createdAt', 'desc').get();
-            const codesGrid = document.getElementById('codesGrid');
-            codesGrid.innerHTML = '';
-            
-            const groupFilter = document.getElementById('codeGroupFilter').value;
-            const searchTerm = document.getElementById('codeSearch')?.value.toLowerCase() || '';
-            
-            for (const doc of snapshot.docs) {
-                const data = doc.data();
+            try {
+                const snapshot = await db.collection(CODES_COLLECTION).orderBy('createdAt', 'desc').get();
+                const codesGrid = document.getElementById('codesGrid');
+                codesGrid.innerHTML = '';
                 
-                // Get group name
-                let groupName = 'Unknown Group';
-                if (data.groupId) {
-                    const groupDoc = await db.collection(GROUPS_COLLECTION).doc(data.groupId).get();
-                    if (groupDoc.exists) {
-                        groupName = groupDoc.data().name;
+                const groupFilter = document.getElementById('codeGroupFilter').value;
+                const searchTerm = document.getElementById('codeSearch')?.value.toLowerCase() || '';
+                
+                for (const doc of snapshot.docs) {
+                    const data = doc.data();
+                    
+                    // Get group name
+                    let groupName = 'Unknown Group';
+                    if (data.groupId) {
+                        const groupDoc = await db.collection(GROUPS_COLLECTION).doc(data.groupId).get();
+                        if (groupDoc.exists) {
+                            groupName = groupDoc.data().name;
+                        }
                     }
+                    
+                    // Apply filters
+                    if (groupFilter && data.groupId !== groupFilter) continue;
+                    if (searchTerm && !data.code.toLowerCase().includes(searchTerm) && !groupName.toLowerCase().includes(searchTerm)) continue;
+                    
+                    const codeCard = createCodeCard(data, doc.id, groupName);
+                    codesGrid.appendChild(codeCard);
                 }
-                
-                // Apply filters
-                if (groupFilter && data.groupId !== groupFilter) continue;
-                if (searchTerm && !data.code.toLowerCase().includes(searchTerm) && !groupName.toLowerCase().includes(searchTerm)) continue;
-                
-                const codeCard = createCodeCard(data, doc.id, groupName);
-                codesGrid.appendChild(codeCard);
+            } catch (error) {
+                console.error('Error loading codes:', error);
             }
         }
 
@@ -1603,17 +1764,21 @@
 
         // Load group select
         async function loadGroupSelect() {
-            const snapshot = await db.collection(GROUPS_COLLECTION).get();
-            const select = document.getElementById('codeGroupId');
-            select.innerHTML = '<option value="">Select Group</option>';
-            
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                const option = document.createElement('option');
-                option.value = doc.id;
-                option.textContent = data.name;
-                select.appendChild(option);
-            });
+            try {
+                const snapshot = await db.collection(GROUPS_COLLECTION).get();
+                const select = document.getElementById('codeGroupId');
+                select.innerHTML = '<option value="">Select Group</option>';
+                
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const option = document.createElement('option');
+                    option.value = doc.id;
+                    option.textContent = data.name;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading groups:', error);
+            }
         }
 
         // Generate code
@@ -1658,22 +1823,26 @@
 
         // Load admins
         async function loadAdmins() {
-            const snapshot = await db.collection(ADMINS_COLLECTION).get();
-            const adminsGrid = document.getElementById('adminsGrid');
-            adminsGrid.innerHTML = '';
-            
-            const searchTerm = document.getElementById('adminSearch')?.value.toLowerCase() || '';
-            
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                const fullName = `${data.firstName} ${data.lastName}`.toLowerCase();
-                const email = (data.email || '').toLowerCase();
+            try {
+                const snapshot = await db.collection(ADMINS_COLLECTION).get();
+                const adminsGrid = document.getElementById('adminsGrid');
+                adminsGrid.innerHTML = '';
                 
-                if (fullName.includes(searchTerm) || email.includes(searchTerm)) {
-                    const adminCard = createAdminCard(data, doc.id);
-                    adminsGrid.appendChild(adminCard);
-                }
-            });
+                const searchTerm = document.getElementById('adminSearch')?.value.toLowerCase() || '';
+                
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const fullName = `${data.firstName} ${data.lastName}`.toLowerCase();
+                    const email = (data.email || '').toLowerCase();
+                    
+                    if (fullName.includes(searchTerm) || email.includes(searchTerm)) {
+                        const adminCard = createAdminCard(data, doc.id);
+                        adminsGrid.appendChild(adminCard);
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading admins:', error);
+            }
         }
 
         // Create admin card
@@ -1759,44 +1928,52 @@
 
         // Load groups for filters
         async function loadGroups() {
-            const snapshot = await db.collection(GROUPS_COLLECTION).get();
-            
-            // Code group filter
-            const codeFilter = document.getElementById('codeGroupFilter');
-            codeFilter.innerHTML = '<option value="">All Groups</option>';
-            
-            // Report group filter
-            const reportGroupFilter = document.getElementById('reportGroupFilter');
-            reportGroupFilter.innerHTML = '<option value="">All Groups</option>';
-            
-            snapshot.forEach(doc => {
-                const data = doc.data();
+            try {
+                const snapshot = await db.collection(GROUPS_COLLECTION).get();
                 
-                const option1 = document.createElement('option');
-                option1.value = doc.id;
-                option1.textContent = data.name;
-                codeFilter.appendChild(option1);
+                // Code group filter
+                const codeFilter = document.getElementById('codeGroupFilter');
+                codeFilter.innerHTML = '<option value="">All Groups</option>';
                 
-                const option2 = document.createElement('option');
-                option2.value = doc.id;
-                option2.textContent = data.name;
-                reportGroupFilter.appendChild(option2);
-            });
+                // Report group filter
+                const reportGroupFilter = document.getElementById('reportGroupFilter');
+                reportGroupFilter.innerHTML = '<option value="">All Groups</option>';
+                
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    
+                    const option1 = document.createElement('option');
+                    option1.value = doc.id;
+                    option1.textContent = data.name;
+                    codeFilter.appendChild(option1);
+                    
+                    const option2 = document.createElement('option');
+                    option2.value = doc.id;
+                    option2.textContent = data.name;
+                    reportGroupFilter.appendChild(option2);
+                });
+            } catch (error) {
+                console.error('Error loading groups:', error);
+            }
         }
 
         // Load filters
         async function loadFilters() {
-            // User filter for reports
-            const userFilter = document.getElementById('reportUserFilter');
-            const snapshot = await db.collection(USERS_COLLECTION).get();
-            
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                const option = document.createElement('option');
-                option.value = doc.id;
-                option.textContent = `${data.firstName} ${data.lastName}`;
-                userFilter.appendChild(option);
-            });
+            try {
+                // User filter for reports
+                const userFilter = document.getElementById('reportUserFilter');
+                const snapshot = await db.collection(USERS_COLLECTION).get();
+                
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const option = document.createElement('option');
+                    option.value = doc.id;
+                    option.textContent = `${data.firstName} ${data.lastName}`;
+                    userFilter.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading filters:', error);
+            }
         }
 
         // Generate report
@@ -1897,21 +2074,25 @@
 
         // Load stats
         async function loadStats() {
-            // Total Users
-            const usersSnapshot = await db.collection(USERS_COLLECTION).get();
-            document.getElementById('totalUsers').textContent = usersSnapshot.size;
-            
-            // Active Emergencies
-            const activeSnapshot = await db.collection(EMERGENCIES_COLLECTION).where('status', '==', 'active').get();
-            document.getElementById('activeEmergencies').textContent = activeSnapshot.size;
-            
-            // In Progress Emergencies
-            const inProgressSnapshot = await db.collection(EMERGENCIES_COLLECTION).where('status', '==', 'in-progress').get();
-            document.getElementById('inProgressEmergencies').textContent = inProgressSnapshot.size;
-            
-            // Completed Emergencies
-            const completedSnapshot = await db.collection(EMERGENCIES_COLLECTION).where('status', '==', 'completed').get();
-            document.getElementById('completedEmergencies').textContent = completedSnapshot.size;
+            try {
+                // Total Users
+                const usersSnapshot = await db.collection(USERS_COLLECTION).get();
+                document.getElementById('totalUsers').textContent = usersSnapshot.size;
+                
+                // Active Emergencies
+                const activeSnapshot = await db.collection(EMERGENCIES_COLLECTION).where('status', '==', 'active').get();
+                document.getElementById('activeEmergencies').textContent = activeSnapshot.size;
+                
+                // In Progress Emergencies
+                const inProgressSnapshot = await db.collection(EMERGENCIES_COLLECTION).where('status', '==', 'in-progress').get();
+                document.getElementById('inProgressEmergencies').textContent = inProgressSnapshot.size;
+                
+                // Completed Emergencies
+                const completedSnapshot = await db.collection(EMERGENCIES_COLLECTION).where('status', '==', 'completed').get();
+                document.getElementById('completedEmergencies').textContent = completedSnapshot.size;
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
         }
 
         // Setup realtime listener
