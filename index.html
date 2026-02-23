@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>DIMAX SOS - Emergency Response</title>
+    <title>DIMAX SOS - Emergency Response V8</title>
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
@@ -124,6 +124,7 @@
             flex: 1;
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
+            max-height: 60vh;
         }
 
         .footer {
@@ -222,6 +223,7 @@
             text-transform: uppercase;
             letter-spacing: 1px;
             -webkit-appearance: none;
+            margin-top: 10px;
         }
 
         .btn-primary:active {
@@ -400,9 +402,6 @@
             color: #333;
             margin-bottom: 15px;
             font-size: 18px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
         }
 
         .history-item {
@@ -418,7 +417,6 @@
             border-left-color: #ff4d4d;
             background: #fff3f3;
             font-weight: 500;
-            border-width: 4px;
         }
 
         @keyframes fadeIn {
@@ -439,78 +437,6 @@
             font-size: 12px;
         }
 
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            justify-content: center;
-            align-items: center;
-            z-index: 2000;
-        }
-
-        .modal-content {
-            background: white;
-            padding: 30px;
-            border-radius: 24px;
-            max-width: 300px;
-            text-align: center;
-            animation: modalSlide 0.3s ease;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-        }
-
-        @keyframes modalSlide {
-            from {
-                transform: translateY(-50px);
-                opacity: 0;
-            }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
-        }
-
-        .modal-content h3 {
-            color: #ff4d4d;
-            margin-bottom: 15px;
-            font-size: 24px;
-        }
-
-        .modal-content p {
-            color: #666;
-            margin-bottom: 25px;
-            font-size: 16px;
-        }
-
-        .modal-buttons {
-            display: flex;
-            gap: 12px;
-            justify-content: center;
-        }
-
-        .modal-btn {
-            flex: 1;
-            padding: 14px;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 16px;
-        }
-
-        .modal-btn.yes {
-            background: #ff4d4d;
-            color: white;
-        }
-
-        .modal-btn.no {
-            background: #e0e0e0;
-            color: #333;
-        }
-
         .hidden {
             display: none !important;
         }
@@ -525,7 +451,7 @@
 </head>
 <body>
     <div class="full-screen">
-        <!-- Landing Page -->
+        <!-- Landing Page (Login/Register) -->
         <div id="landingPage" class="container">
             <div class="landing-header">
                 <span class="landing-logo">DIMAX SOS</span>
@@ -553,7 +479,7 @@
                         </div>
                         <button type="submit" class="btn-primary">Mag-login</button>
                     </form>
-                    <div id="loginMessage" style="margin-top: 15px;"></div>
+                    <div id="loginMessage" class="message" style="margin-top: 15px;"></div>
                 </div>
 
                 <!-- Registration Form -->
@@ -561,11 +487,11 @@
                     <h2>Magparehistro</h2>
                     <form id="registerFormElement">
                         <div class="form-group">
-                            <label>Pangalan</label>
+                            <label>Pangalan <span style="color: #666; font-size: 12px;">(First Name)</span></label>
                             <input type="text" id="firstName" placeholder="Juan" required>
                         </div>
                         <div class="form-group">
-                            <label>Apelyido</label>
+                            <label>Apelyido <span style="color: #666; font-size: 12px;">(Last Name)</span></label>
                             <input type="text" id="lastName" placeholder="Dela Cruz" required>
                         </div>
                         <div class="form-group">
@@ -583,10 +509,11 @@
                         <div class="form-group">
                             <label>Registration Code</label>
                             <input type="text" id="regCode" placeholder="Enter DIMAX group code" required>
+                            <small style="color: #888; font-size: 12px; display: block; margin-top: 5px;">Ipasok ang code na ibinigay ng inyong grupo</small>
                         </div>
                         <button type="submit" class="btn-primary">Magparehistro</button>
                     </form>
-                    <div id="registerMessage" style="margin-top: 15px;"></div>
+                    <div id="registerMessage" class="message" style="margin-top: 15px;"></div>
                 </div>
             </div>
 
@@ -622,18 +549,6 @@
                     <h3>📋 Kasaysayan ng Emergency</h3>
                     <div id="historyList"></div>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Confirmation Modal -->
-    <div id="confirmModal" class="modal">
-        <div class="modal-content">
-            <h3>⚠️ Kumpirmahin</h3>
-            <p>Sigurado ka bang may emergency?</p>
-            <div class="modal-buttons">
-                <button id="confirmYes" class="modal-btn yes">Oo</button>
-                <button id="confirmNo" class="modal-btn no">Hindi</button>
             </div>
         </div>
     </div>
@@ -765,13 +680,14 @@
             }
         });
 
+        // This function triggers the browser's native "Allow" location popup
         function getCurrentPosition() {
             return new Promise((resolve, reject) => {
                 if (!navigator.geolocation) {
                     reject(new Error('Geolocation not supported'));
                     return;
                 }
-                // This triggers the browser's native permission popup
+                // THIS triggers the browser's native permission popup
                 navigator.geolocation.getCurrentPosition(resolve, reject, {
                     enableHighAccuracy: true,
                     timeout: 30000,
@@ -816,6 +732,11 @@
             const historyList = document.getElementById('historyList');
             historyList.innerHTML = '';
             
+            if (snapshot.empty) {
+                historyList.innerHTML = '<p style="color: #666; text-align: center; padding: 15px;">Walang record ng emergency.</p>';
+                return;
+            }
+            
             snapshot.forEach(doc => {
                 const data = doc.data();
                 const date = data.timestamp ? new Date(data.timestamp.seconds * 1000).toLocaleString() : 'Unknown';
@@ -832,29 +753,14 @@
         }
 
         const sosButton = document.getElementById('sosButton');
-        const modal = document.getElementById('confirmModal');
-        const confirmYes = document.getElementById('confirmYes');
-        const confirmNo = document.getElementById('confirmNo');
 
-        sosButton.addEventListener('click', () => {
+        // Direct toggle - NO CONFIRMATION MODAL
+        sosButton.addEventListener('click', async () => {
             if (isSOSActive) {
-                deactivateSOS();
+                await deactivateSOS();
             } else {
-                modal.style.display = 'flex';
+                await activateSOS();
             }
-        });
-
-        confirmNo.addEventListener('click', () => {
-            modal.style.display = 'none';
-        });
-
-        confirmYes.addEventListener('click', async () => {
-            modal.style.display = 'none';
-            await activateSOS();
-        });
-
-        window.addEventListener('click', (e) => {
-            if (e.target === modal) modal.style.display = 'none';
         });
 
         async function activateSOS() {
@@ -885,7 +791,7 @@
                 document.querySelector('.sos-instruction').textContent = 'ENGAGED - Press to stop';
                 statusDiv.innerHTML = '✅ SOS Activated - Binabasa ang lokasyon...';
 
-                // This will trigger the browser's native location popup
+                // THIS triggers the browser's native "Allow" location popup
                 try {
                     const position = await getCurrentPosition();
                     await db.collection(EMERGENCIES_COLLECTION).doc(currentEmergencyId).update({
@@ -898,6 +804,7 @@
                     statusDiv.innerHTML = '✅ SOS Activated - Ibinahagi ang lokasyon';
                     startWatchingPosition(currentEmergencyId);
                 } catch (locationError) {
+                    // User denied location or error occurred - SOS still active
                     statusDiv.innerHTML = '✅ SOS Activated - Walang lokasyon';
                     console.log('Location not shared');
                 }
@@ -924,6 +831,11 @@
             sosButton.classList.remove('active');
             document.querySelector('.sos-instruction').textContent = 'Pindutin kung may emergency';
             document.getElementById('sosStatus').innerHTML = '✅ SOS Deactivated';
+            
+            const user = auth.currentUser;
+            if (user) {
+                loadEmergencyHistory(user.uid);
+            }
         }
 
         // Auto-scroll for registration
