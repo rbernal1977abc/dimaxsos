@@ -48,7 +48,6 @@
             }
         }
 
-        /* Landing Page Container */
         .container {
             max-width: 420px;
             width: 100%;
@@ -230,7 +229,6 @@
             opacity: 0.9;
         }
 
-        /* SOS Page */
         .sos-page {
             display: none;
             width: 100%;
@@ -318,11 +316,6 @@
             animation: pulse 1.5s infinite;
         }
 
-        .sos-button.pressed {
-            transform: scale(0.88);
-            border-width: 10px;
-        }
-
         @keyframes pulse {
             0% {
                 box-shadow: 0 0 0 0 rgba(255,68,68,0.7), inset 0 0 20px rgba(0,0,0,0.3);
@@ -340,7 +333,6 @@
             margin-bottom: 5px;
             font-weight: 900;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-            transition: all 0.2s ease;
         }
 
         .sos-button.active .sos-text {
@@ -352,12 +344,10 @@
             font-weight: 500;
             text-align: center;
             padding: 0 10px;
-            transition: all 0.2s ease;
         }
 
         .sos-button.active .sos-instruction {
             font-weight: bold;
-            letter-spacing: 0.5px;
         }
 
         .status-message {
@@ -387,12 +377,6 @@
             border: 1px solid #bee5eb;
         }
 
-        .warning {
-            background: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeeba;
-        }
-
         .emergency-history {
             margin-top: 30px;
             text-align: left;
@@ -410,24 +394,12 @@
             border-radius: 12px;
             margin-bottom: 10px;
             border-left: 4px solid #ff4d4d;
-            animation: fadeIn 0.3s ease;
         }
 
         .history-item.active {
             border-left-color: #ff4d4d;
             background: #fff3f3;
             font-weight: 500;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(-8px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
         }
 
         .history-item small {
@@ -440,18 +412,11 @@
         .hidden {
             display: none !important;
         }
-
-        input[type="email"], 
-        input[type="password"], 
-        input[type="tel"], 
-        input[type="text"] {
-            font-size: 16px;
-        }
     </style>
 </head>
 <body>
     <div class="full-screen">
-        <!-- Landing Page (Login/Register) -->
+        <!-- Landing Page -->
         <div id="landingPage" class="container">
             <div class="landing-header">
                 <span class="landing-logo">DIMAX SOS</span>
@@ -465,7 +430,6 @@
             </div>
 
             <div class="content-scroll">
-                <!-- Login Form -->
                 <div id="loginForm" class="form-container active">
                     <h2>Mag-login</h2>
                     <form id="loginFormElement">
@@ -479,19 +443,18 @@
                         </div>
                         <button type="submit" class="btn-primary">Mag-login</button>
                     </form>
-                    <div id="loginMessage" class="message" style="margin-top: 15px;"></div>
+                    <div id="loginMessage" style="margin-top: 15px;"></div>
                 </div>
 
-                <!-- Registration Form -->
                 <div id="registerForm" class="form-container">
                     <h2>Magparehistro</h2>
                     <form id="registerFormElement">
                         <div class="form-group">
-                            <label>Pangalan <span style="color: #666; font-size: 12px;">(First Name)</span></label>
+                            <label>Pangalan</label>
                             <input type="text" id="firstName" placeholder="Juan" required>
                         </div>
                         <div class="form-group">
-                            <label>Apelyido <span style="color: #666; font-size: 12px;">(Last Name)</span></label>
+                            <label>Apelyido</label>
                             <input type="text" id="lastName" placeholder="Dela Cruz" required>
                         </div>
                         <div class="form-group">
@@ -508,18 +471,17 @@
                         </div>
                         <div class="form-group">
                             <label>Registration Code</label>
-                            <input type="text" id="regCode" placeholder="Enter DIMAX group code" required>
-                            <small style="color: #888; font-size: 12px; display: block; margin-top: 5px;">Ipasok ang code na ibinigay ng inyong grupo</small>
+                            <input type="text" id="regCode" placeholder="Enter DIMAX code" required>
                         </div>
                         <button type="submit" class="btn-primary">Magparehistro</button>
                     </form>
-                    <div id="registerMessage" class="message" style="margin-top: 15px;"></div>
+                    <div id="registerMessage" style="margin-top: 15px;"></div>
                 </div>
             </div>
 
             <div class="footer">
                 <span>🚨 DIMAX SOS</span><br>
-                <span>Developed by <span class="company">RP8 & Dimax</span></span>
+                <span>Developed by RP8 & Dimax</span>
             </div>
         </div>
 
@@ -567,8 +529,9 @@
         const auth = firebase.auth();
         const db = firebase.firestore();
 
-        // Set persistence
-        auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+        // Enable offline persistence
+        db.enablePersistence()
+            .catch(err => console.log('Persistence error:', err));
 
         const USERS_COLLECTION = 'registered_users';
         const EMERGENCIES_COLLECTION = 'emergencies';
@@ -576,18 +539,22 @@
         const GROUPS_COLLECTION = 'groups';
 
         let isSOSActive = false;
-        let watchPositionId = null;
+        let watchId = null;
         let currentEmergencyId = null;
-        let currentUserData = null;
+        let currentUser = null;
 
         // Auth state observer
         auth.onAuthStateChanged(async (user) => {
             if (user) {
-                const userDoc = await db.collection(USERS_COLLECTION).doc(user.uid).get();
-                if (userDoc.exists) {
-                    currentUserData = userDoc.data();
-                    showSOSPage();
-                    loadEmergencyHistory(user.uid);
+                try {
+                    const userDoc = await db.collection(USERS_COLLECTION).doc(user.uid).get();
+                    if (userDoc.exists) {
+                        currentUser = userDoc.data();
+                        showSOSPage();
+                        loadHistory();
+                    }
+                } catch (error) {
+                    console.error('Error loading user:', error);
                 }
             } else {
                 showLandingPage();
@@ -597,9 +564,9 @@
         function showSOSPage() {
             document.getElementById('landingPage').style.display = 'none';
             document.getElementById('sosPage').classList.add('active');
-            document.getElementById('displayName').textContent = `${currentUserData.firstName} ${currentUserData.lastName}`;
-            if (currentUserData.groupName) {
-                document.getElementById('groupBadge').textContent = `👥 ${currentUserData.groupName}`;
+            document.getElementById('displayName').textContent = `${currentUser.firstName} ${currentUser.lastName}`;
+            if (currentUser.groupName) {
+                document.getElementById('groupBadge').textContent = `👥 ${currentUser.groupName}`;
             }
         }
 
@@ -622,7 +589,7 @@
             }
         };
 
-        // Handle Login
+        // Login
         document.getElementById('loginFormElement').addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = document.getElementById('loginEmail').value;
@@ -630,11 +597,11 @@
             try {
                 await auth.signInWithEmailAndPassword(email, password);
             } catch (error) {
-                document.getElementById('loginMessage').innerHTML = '❌ Login failed';
+                document.getElementById('loginMessage').innerHTML = '❌ ' + error.message;
             }
         });
 
-        // Handle Registration
+        // Register
         document.getElementById('registerFormElement').addEventListener('submit', async (e) => {
             e.preventDefault();
             const firstName = document.getElementById('firstName').value;
@@ -643,69 +610,71 @@
             const password = document.getElementById('regPassword').value;
             const contactNumber = document.getElementById('contactNumber').value;
             const regCode = document.getElementById('regCode').value;
-            const messageDiv = document.getElementById('registerMessage');
 
             try {
-                const codeQuery = await db.collection(CODES_COLLECTION)
+                // Check code
+                const codeSnapshot = await db.collection(CODES_COLLECTION)
                     .where('code', '==', regCode)
                     .where('used', '==', false)
                     .get();
 
-                if (codeQuery.empty) {
-                    messageDiv.innerHTML = '❌ Invalid registration code';
+                if (codeSnapshot.empty) {
+                    alert('Invalid registration code');
                     return;
                 }
 
-                const groupId = codeQuery.docs[0].data().groupId;
-                const groupDoc = await db.collection(GROUPS_COLLECTION).doc(groupId).get();
-                const groupName = groupDoc.exists ? groupDoc.data().name : 'Unknown Group';
+                const codeData = codeSnapshot.docs[0].data();
+                
+                // Get group
+                const groupDoc = await db.collection(GROUPS_COLLECTION).doc(codeData.groupId).get();
+                const groupName = groupDoc.exists ? groupDoc.data().name : 'Unknown';
 
-                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-                const user = userCredential.user;
-
-                await db.collection(USERS_COLLECTION).doc(user.uid).set({
-                    userId: user.uid,
+                // Create user
+                const userCred = await auth.createUserWithEmailAndPassword(email, password);
+                
+                // Save user data
+                await db.collection(USERS_COLLECTION).doc(userCred.user.uid).set({
+                    userId: userCred.user.uid,
                     firstName: firstName,
                     lastName: lastName,
                     email: email,
                     contactNumber: contactNumber,
-                    groupId: groupId,
+                    groupId: codeData.groupId,
                     groupName: groupName,
-                    registeredAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    status: 'active'
+                    registeredAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
 
-                await codeQuery.docs[0].ref.update({
+                // Mark code as used
+                await codeSnapshot.docs[0].ref.update({
                     used: true,
-                    usedBy: user.uid
+                    usedBy: userCred.user.uid
                 });
 
             } catch (error) {
-                messageDiv.innerHTML = '❌ Registration failed: ' + error.message;
+                document.getElementById('registerMessage').innerHTML = '❌ ' + error.message;
             }
         });
 
-        // Get current position - TRIGGERS BROWSER POPUP
-        function getCurrentPosition() {
+        // Get location
+        function getLocation() {
             return new Promise((resolve, reject) => {
                 if (!navigator.geolocation) {
                     reject(new Error('Geolocation not supported'));
                     return;
                 }
-                // THIS shows the browser's native "Allow" popup
                 navigator.geolocation.getCurrentPosition(resolve, reject, {
                     enableHighAccuracy: true,
-                    timeout: 30000,
+                    timeout: 10000,
                     maximumAge: 0
                 });
             });
         }
 
-        // Start watching position
-        function startWatchingPosition(emergencyId) {
+        // Start tracking
+        function startTracking(emergencyId) {
             if (!navigator.geolocation) return;
             
-            watchPositionId = navigator.geolocation.watchPosition(
+            watchId = navigator.geolocation.watchPosition(
                 async (position) => {
                     if (emergencyId) {
                         try {
@@ -714,165 +683,158 @@
                                     lat: position.coords.latitude,
                                     lng: position.coords.longitude
                                 },
-                                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                                lastUpdate: firebase.firestore.FieldValue.serverTimestamp()
                             });
                         } catch (error) {
-                            console.error('Error updating location:', error);
+                            console.error('Update error:', error);
                         }
                     }
                 },
                 (error) => console.error('Watch error:', error),
-                { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+                { enableHighAccuracy: true, timeout: 5000 }
             );
         }
 
-        function stopWatchingPosition() {
-            if (watchPositionId) {
-                navigator.geolocation.clearWatch(watchPositionId);
-                watchPositionId = null;
+        // Stop tracking
+        function stopTracking() {
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
             }
         }
 
-        async function loadEmergencyHistory(userId) {
+        // Load history
+        async function loadHistory() {
+            if (!auth.currentUser) return;
+            
             try {
                 const snapshot = await db.collection(EMERGENCIES_COLLECTION)
-                    .where('userId', '==', userId)
+                    .where('userId', '==', auth.currentUser.uid)
                     .orderBy('timestamp', 'desc')
                     .limit(10)
                     .get();
                 
-                const historyList = document.getElementById('historyList');
-                historyList.innerHTML = '';
+                const list = document.getElementById('historyList');
+                list.innerHTML = '';
                 
                 if (snapshot.empty) {
-                    historyList.innerHTML = '<p style="color: #666; text-align: center; padding: 15px;">Walang record ng emergency.</p>';
+                    list.innerHTML = '<p style="text-align:center;color:#666;">Walang record</p>';
                     return;
                 }
                 
                 snapshot.forEach(doc => {
                     const data = doc.data();
                     const date = data.timestamp ? new Date(data.timestamp.seconds * 1000).toLocaleString() : 'Unknown';
-                    const item = document.createElement('div');
-                    item.className = 'history-item';
-                    if (doc.id === currentEmergencyId) item.classList.add('active');
-                    item.innerHTML = `
+                    const div = document.createElement('div');
+                    div.className = 'history-item';
+                    if (doc.id === currentEmergencyId) div.classList.add('active');
+                    div.innerHTML = `
                         <strong>🚨 Emergency</strong><br>
                         ${data.location ? '📍 With location' : '📍 No location'}<br>
                         <small>📅 ${date}</small>
                     `;
-                    historyList.appendChild(item);
+                    list.appendChild(div);
                 });
             } catch (error) {
-                console.error('Error loading history:', error);
+                console.error('History error:', error);
             }
         }
 
-        // SOS Button - DIRECT ACTIVATION, NO CONFIRMATION
+        // SOS Button
         const sosButton = document.getElementById('sosButton');
+        const statusDiv = document.getElementById('sosStatus');
 
         sosButton.addEventListener('click', async () => {
             if (isSOSActive) {
-                await deactivateSOS();
-            } else {
-                await activateSOS();
-            }
-        });
-
-        async function activateSOS() {
-            const statusDiv = document.getElementById('sosStatus');
-            statusDiv.innerHTML = '📍 Ina-activate ang SOS...';
-            statusDiv.className = 'status-message info';
-
-            try {
-                const user = auth.currentUser;
-                if (!user) throw new Error('Not logged in');
-
-                // Create emergency record immediately
-                const emergencyData = {
-                    userId: user.uid,
-                    userName: `${currentUserData.firstName} ${currentUserData.lastName}`,
-                    contactNumber: currentUserData.contactNumber,
-                    groupId: currentUserData.groupId,
-                    groupName: currentUserData.groupName,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                    status: 'active',
-                    system: 'DIMAX SOS'
-                };
-
-                const emergencyRef = await db.collection(EMERGENCIES_COLLECTION).add(emergencyData);
-                currentEmergencyId = emergencyRef.id;
-
-                // Update button state immediately
-                isSOSActive = true;
-                sosButton.classList.add('active');
-                document.querySelector('.sos-instruction').textContent = 'PRESS TO STOP';
+                // Deactivate
+                stopTracking();
                 
-                statusDiv.innerHTML = '✅ SOS Activated - Binabasa ang lokasyon...';
-
-                // Try to get location (this triggers browser popup)
-                try {
-                    const position = await getCurrentPosition();
-                    
-                    // Update emergency with location
-                    await db.collection(EMERGENCIES_COLLECTION).doc(currentEmergencyId).update({
-                        location: {
-                            lat: position.coords.latitude,
-                            lng: position.coords.longitude
-                        },
-                        googleMapsLink: `https://www.google.com/maps?q=${position.coords.latitude},${position.coords.longitude}`
-                    });
-                    
-                    statusDiv.innerHTML = '✅ SOS Activated - Ibinahagi ang lokasyon';
-                    
-                    // Start continuous tracking
-                    startWatchingPosition(currentEmergencyId);
-                    
-                } catch (locationError) {
-                    // User denied or error - SOS still active
-                    statusDiv.innerHTML = '✅ SOS Activated - Walang lokasyon';
+                if (currentEmergencyId) {
+                    try {
+                        await db.collection(EMERGENCIES_COLLECTION).doc(currentEmergencyId).update({
+                            status: 'completed',
+                            endedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    } catch (error) {
+                        console.error('Deactivate error:', error);
+                    }
                 }
-
-                loadEmergencyHistory(user.uid);
-
-            } catch (error) {
-                console.error('SOS error:', error);
-                statusDiv.innerHTML = '❌ Failed to activate SOS';
-                statusDiv.className = 'status-message error';
+                
+                isSOSActive = false;
+                currentEmergencyId = null;
                 sosButton.classList.remove('active');
                 document.querySelector('.sos-instruction').textContent = 'Pindutin kung may emergency';
-            }
-        }
-
-        async function deactivateSOS() {
-            stopWatchingPosition();
-            
-            if (currentEmergencyId) {
+                statusDiv.innerHTML = '✅ SOS Deactivated';
+                statusDiv.className = 'status-message success';
+                loadHistory();
+                
+            } else {
+                // Activate
+                statusDiv.innerHTML = '📍 Ina-activate...';
+                statusDiv.className = 'status-message info';
+                
                 try {
-                    await db.collection(EMERGENCIES_COLLECTION).doc(currentEmergencyId).update({
-                        status: 'completed',
-                        endedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
+                    const user = auth.currentUser;
+                    if (!user) throw new Error('Not logged in');
+
+                    // Get user data
+                    const userDoc = await db.collection(USERS_COLLECTION).doc(user.uid).get();
+                    const userData = userDoc.data();
+
+                    // Create emergency WITHOUT location first
+                    const emergencyData = {
+                        userId: user.uid,
+                        userName: `${userData.firstName} ${userData.lastName}`,
+                        contactNumber: userData.contactNumber,
+                        groupId: userData.groupId,
+                        groupName: userData.groupName,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        status: 'active',
+                        createdAt: new Date().toISOString()
+                    };
+
+                    // Save to Firestore
+                    const docRef = await db.collection(EMERGENCIES_COLLECTION).add(emergencyData);
+                    currentEmergencyId = docRef.id;
+
+                    // Update UI
+                    isSOSActive = true;
+                    sosButton.classList.add('active');
+                    document.querySelector('.sos-instruction').textContent = 'PRESS TO STOP';
+                    statusDiv.innerHTML = '✅ SOS Activated - Getting location...';
+
+                    // Try to get location
+                    try {
+                        const position = await getLocation();
+                        
+                        // Update with location
+                        await db.collection(EMERGENCIES_COLLECTION).doc(currentEmergencyId).update({
+                            location: {
+                                lat: position.coords.latitude,
+                                lng: position.coords.longitude
+                            },
+                            hasLocation: true
+                        });
+                        
+                        statusDiv.innerHTML = '✅ SOS Activated - Location shared';
+                        
+                        // Start tracking
+                        startTracking(currentEmergencyId);
+                        
+                    } catch (locError) {
+                        console.log('Location error:', locError);
+                        statusDiv.innerHTML = '✅ SOS Activated - No location';
+                    }
+                    
+                    loadHistory();
+
                 } catch (error) {
-                    console.error('Error deactivating:', error);
+                    console.error('SOS error:', error);
+                    statusDiv.innerHTML = '❌ Failed: ' + error.message;
+                    statusDiv.className = 'status-message error';
+                    sosButton.classList.remove('active');
                 }
             }
-            
-            isSOSActive = false;
-            currentEmergencyId = null;
-            sosButton.classList.remove('active');
-            document.querySelector('.sos-instruction').textContent = 'Pindutin kung may emergency';
-            document.getElementById('sosStatus').innerHTML = '✅ SOS Deactivated';
-            
-            if (auth.currentUser) {
-                loadEmergencyHistory(auth.currentUser.uid);
-            }
-        }
-
-        // Auto-scroll for registration
-        document.querySelectorAll('input').forEach(input => {
-            input.addEventListener('focus', () => {
-                setTimeout(() => input.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
-            });
         });
     </script>
 </body>
