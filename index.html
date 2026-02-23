@@ -66,17 +66,6 @@
             flex-direction: column;
         }
 
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateY(15px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
         .landing-header {
             background: linear-gradient(135deg, #ff4d4d 0%, #cc0000 100%);
             padding: 20px 15px;
@@ -130,7 +119,6 @@
             border-bottom: 3px solid #ff4d4d;
         }
 
-        /* Scrollable content area for registration */
         .content-scroll {
             flex: 1;
             overflow-y: auto;
@@ -212,7 +200,7 @@
             font-weight: 600;
         }
 
-        /* SOS Page - NO SCROLL, everything fits perfectly */
+        /* SOS Page - HUGE BUTTON */
         .sos-page {
             display: none;
             max-width: 400px;
@@ -232,14 +220,14 @@
 
         .sos-header {
             background: linear-gradient(135deg, #ff4d4d 0%, #cc0000 100%);
-            padding: 16px 15px;
+            padding: 15px;
             text-align: center;
             color: white;
             flex-shrink: 0;
         }
 
         .sos-logo {
-            font-size: 24px;
+            font-size: 22px;
             font-weight: 900;
             display: block;
             letter-spacing: 1px;
@@ -249,47 +237,49 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            padding: 12px 15px 8px 15px;
+            padding: 10px 15px 5px 15px;
             background: white;
-            justify-content: space-between;
         }
 
         .user-info-card {
             background: #f8f9fa;
-            padding: 10px;
-            border-radius: 14px;
+            padding: 8px;
+            border-radius: 12px;
             text-align: center;
             border-left: 4px solid #ff4d4d;
             flex-shrink: 0;
+            margin-bottom: 5px;
         }
 
         .user-name-display {
-            font-size: 20px;
+            font-size: 18px;
             font-weight: bold;
             color: #333;
-            margin-bottom: 3px;
         }
 
         .user-group-display {
             color: #ff4d4d;
             font-weight: 600;
-            font-size: 14px;
+            font-size: 13px;
+            margin-top: 2px;
         }
 
         .sos-button-container {
             display: flex;
             justify-content: center;
-            margin: 5px 0 8px;
-            flex-shrink: 0;
+            align-items: center;
+            flex: 1;
+            min-height: 0;
+            margin: 5px 0;
         }
 
-        /* BIGGER SOS BUTTON */
+        /* HUGE SOS BUTTON */
         .sos-button {
-            width: 220px;
-            height: 220px;
+            width: 280px;
+            height: 280px;
             border-radius: 50%;
             background: linear-gradient(135deg, #ff4d4d, #cc0000);
-            border: 8px solid #ffb3b3;
+            border: 10px solid #ffb3b3;
             color: white;
             font-weight: bold;
             cursor: pointer;
@@ -297,7 +287,7 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            box-shadow: 0 20px 40px rgba(255,68,68,0.5);
+            box-shadow: 0 25px 50px rgba(255,68,68,0.5);
             transition: all 0.2s ease;
         }
 
@@ -310,39 +300,39 @@
 
         @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(255,68,68,0.7); }
-            70% { box-shadow: 0 0 0 20px rgba(255,68,68,0); }
+            70% { box-shadow: 0 0 0 25px rgba(255,68,68,0); }
             100% { box-shadow: 0 0 0 0 rgba(255,68,68,0); }
         }
 
         .sos-text {
-            font-size: 52px;
+            font-size: 70px;
             font-weight: 900;
-            margin-bottom: 4px;
-            text-shadow: 2px 2px 0 rgba(0,0,0,0.2);
+            margin-bottom: 8px;
+            text-shadow: 3px 3px 0 rgba(0,0,0,0.2);
         }
 
         .sos-engaged {
-            font-size: 18px;
+            font-size: 22px;
             font-weight: 800;
+            margin-bottom: 4px;
         }
 
         .sos-press-to-stop {
-            font-size: 13px;
+            font-size: 16px;
             font-weight: 500;
-            margin-top: 3px;
         }
 
         .sos-instruction {
-            font-size: 13px;
+            font-size: 16px;
             font-weight: 500;
             text-align: center;
-            padding: 0 5px;
+            padding: 0 10px;
             line-height: 1.3;
         }
 
         .status-message {
-            margin: 6px 0;
-            padding: 8px;
+            margin: 4px 0;
+            padding: 6px;
             border-radius: 8px;
             font-size: 12px;
             text-align: center;
@@ -358,56 +348,41 @@
             font-size: 11px;
             color: #666;
             text-align: center;
-            margin: 4px 0 6px;
-            padding: 6px;
+            margin: 2px 0 4px;
+            padding: 4px;
             background: #f8f9fa;
             border-radius: 6px;
             border-left: 3px solid #ff4d4d;
             flex-shrink: 0;
         }
 
-        .emergency-history {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            min-height: 0;
-            margin-top: 4px;
+        /* Announcement Section - replaced Kasaysayan */
+        .announcement-section {
+            flex-shrink: 0;
+            margin-top: 5px;
+            border-top: 1px solid #e0e0e0;
+            padding-top: 5px;
         }
 
-        .emergency-history h3 {
-            color: #333;
-            margin-bottom: 5px;
-            font-size: 14px;
+        .announcement-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #ff4d4d;
+            margin-bottom: 4px;
             display: flex;
             align-items: center;
             gap: 4px;
-            flex-shrink: 0;
         }
 
-        .history-list {
-            flex: 1;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            padding-right: 2px;
-        }
-
-        .history-item {
+        .announcement-content {
             background: #f8f9fa;
-            padding: 8px 10px;
+            padding: 8px;
             border-radius: 8px;
-            border-left: 4px solid #ff4d4d;
-            font-size: 11px;
-            line-height: 1.3;
-            flex-shrink: 0;
-        }
-
-        .history-item small {
+            font-size: 12px;
             color: #666;
-            display: block;
-            margin-top: 3px;
-            font-size: 9px;
+            text-align: center;
+            border-left: 3px solid #ff4d4d;
+            font-style: italic;
         }
 
         .hidden {
@@ -486,7 +461,7 @@
             </div>
         </div>
 
-        <!-- SOS Page - NO SCROLL, bigger button -->
+        <!-- SOS Page - HUGE BUTTON with Announcement -->
         <div id="sosPage" class="sos-page">
             <div class="sos-header">
                 <span class="sos-logo">DIMAX Emergency</span>
@@ -506,11 +481,16 @@
                 </div>
                 
                 <div id="sosStatus" class="status-message"></div>
-                <div id="locationNote" class="location-note">📍 Ibahagi ang location para sa rescue</div>
+                <div id="locationNote" class="location-note">📍 Ibahagi ang location</div>
                 
-                <div class="emergency-history">
-                    <h3>📋 Kasaysayan</h3>
-                    <div id="historyList" class="history-list"></div>
+                <!-- Announcement Section - replaces Kasaysayan -->
+                <div class="announcement-section">
+                    <div class="announcement-title">
+                        <span>📢 Announcement</span>
+                    </div>
+                    <div class="announcement-content">
+                        ⚙️ Work in progress
+                    </div>
                 </div>
             </div>
         </div>
@@ -539,7 +519,6 @@
         let watchId = null;
         let currentEmergencyId = null;
         let currentUser = null;
-        let locationRequestInProgress = false;
 
         auth.onAuthStateChanged(async (user) => {
             if (user) {
@@ -547,7 +526,6 @@
                 if (userDoc.exists) {
                     currentUser = userDoc.data();
                     showSOSPage();
-                    loadHistory();
                 }
             } else {
                 showLandingPage();
@@ -570,7 +548,7 @@
             sosButton.classList.remove('active');
             document.querySelector('.sos-instruction').innerHTML = 'Pindutin kung may emergency';
             document.getElementById('sosStatus').innerHTML = '';
-            document.getElementById('locationNote').innerHTML = '📍 Ibahagi ang location para sa rescue';
+            document.getElementById('locationNote').innerHTML = '📍 Ibahagi ang location';
             stopTracking();
         }
 
@@ -647,15 +625,13 @@
             }
         });
 
-        // Location request - MUST be called directly from user gesture
+        // Location request - direct from user gesture
         function requestLocation() {
             return new Promise((resolve, reject) => {
                 if (!navigator.geolocation) {
                     reject(new Error('Geolocation not supported'));
                     return;
                 }
-                
-                // This direct call triggers Safari's popup
                 navigator.geolocation.getCurrentPosition(resolve, reject, {
                     enableHighAccuracy: true,
                     timeout: 30000,
@@ -664,7 +640,6 @@
             });
         }
 
-        // Start tracking
         function startTracking(emergencyId) {
             if (!navigator.geolocation) return;
             
@@ -692,45 +667,12 @@
             }
         }
 
-        async function loadHistory() {
-            if (!auth.currentUser) return;
-            
-            const snapshot = await db.collection(EMERGENCIES_COLLECTION)
-                .where('userId', '==', auth.currentUser.uid)
-                .orderBy('timestamp', 'desc')
-                .limit(3)
-                .get();
-            
-            const list = document.getElementById('historyList');
-            list.innerHTML = '';
-            
-            if (snapshot.empty) {
-                list.innerHTML = '<div class="history-item">Walang record ng emergency</div>';
-                return;
-            }
-            
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                const date = data.timestamp ? new Date(data.timestamp.seconds * 1000).toLocaleString() : 'Unknown';
-                const locationText = data.location ? '📍 May location' : '📍 Walang location';
-                list.innerHTML += `
-                    <div class="history-item">
-                        <strong>🚨 Emergency</strong> ${locationText}<br>
-                        <small>📅 ${date}</small>
-                    </div>
-                `;
-            });
-        }
-
         // SOS Button
         const sosButton = document.getElementById('sosButton');
         const statusDiv = document.getElementById('sosStatus');
         const locationNote = document.getElementById('locationNote');
 
-        sosButton.addEventListener('click', async (event) => {
-            // Prevent multiple simultaneous requests
-            if (locationRequestInProgress) return;
-            
+        sosButton.addEventListener('click', async () => {
             if (isSOSActive) {
                 // STOP Pressed
                 stopTracking();
@@ -739,18 +681,15 @@
                 statusDiv.className = 'status-message info';
                 
             } else {
-                // SOS Pressed - Start location request IMMEDIATELY
-                locationRequestInProgress = true;
-                
-                statusDiv.innerHTML = '📍 Humihingi ng location...';
+                // SOS Pressed - Request location immediately
+                statusDiv.innerHTML = '📍 Asking for location...';
                 statusDiv.className = 'status-message info';
-                locationNote.innerHTML = '📍 Please allow location access';
+                locationNote.innerHTML = '📍 Please allow location';
                 
                 try {
-                    // Request location FIRST - this must be direct from click
+                    // Request location FIRST - this triggers Safari popup
                     const position = await requestLocation();
                     
-                    // If we get here, user allowed location
                     const user = auth.currentUser;
                     if (!user) throw new Error('Not logged in');
 
@@ -779,17 +718,14 @@
                     isSOSActive = true;
                     sosButton.classList.add('active');
                     document.querySelector('.sos-instruction').innerHTML = '<span class="sos-engaged">ENGAGED</span><br><span class="sos-press-to-stop">PRESS TO STOP</span>';
-                    statusDiv.innerHTML = '✅ SOS Active - Ibinahagi ang location';
-                    locationNote.innerHTML = '📍 Location shared - Salamat!';
+                    statusDiv.innerHTML = '✅ SOS Active - Location shared';
+                    locationNote.innerHTML = '📍 Location shared';
                     
-                    // Start tracking
                     startTracking(currentEmergencyId);
                     
                 } catch (error) {
-                    console.log('Location error:', error);
-                    
                     if (error.code === 1) {
-                        // User denied location - still send SOS without location
+                        // User denied location - send SOS without location
                         try {
                             const user = auth.currentUser;
                             if (!user) throw new Error('Not logged in');
@@ -813,25 +749,20 @@
                             isSOSActive = true;
                             sosButton.classList.add('active');
                             document.querySelector('.sos-instruction').innerHTML = '<span class="sos-engaged">ENGAGED</span><br><span class="sos-press-to-stop">PRESS TO STOP</span>';
-                            statusDiv.innerHTML = '✅ SOS Active - Walang location';
-                            locationNote.innerHTML = '📍 Hindi pinayagan ang location';
+                            statusDiv.innerHTML = '✅ SOS Active - No location';
+                            locationNote.innerHTML = '📍 Location denied';
                             
                         } catch (firebaseError) {
-                            statusDiv.innerHTML = '❌ Nabigo ang SOS';
+                            statusDiv.innerHTML = '❌ SOS Failed';
                             statusDiv.className = 'status-message error';
                             resetSOSButton();
                         }
                     } else {
-                        // Other location error
-                        locationNote.innerHTML = '📍 Hindi makuha ang location';
+                        locationNote.innerHTML = '📍 Location unavailable';
                         statusDiv.innerHTML = '❌ Location error';
                         statusDiv.className = 'status-message error';
                     }
-                } finally {
-                    locationRequestInProgress = false;
                 }
-                
-                loadHistory();
             }
         });
     </script>
