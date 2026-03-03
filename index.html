@@ -274,6 +274,7 @@
             flex: 1;
             min-height: 0;
             margin: 5px 0;
+            position: relative;
         }
 
         /* HUGE SOS BUTTON */
@@ -292,6 +293,7 @@
             align-items: center;
             box-shadow: 0 25px 50px rgba(255,68,68,0.5);
             transition: all 0.2s ease;
+            position: relative;
         }
 
         .sos-button.active {
@@ -307,11 +309,23 @@
             100% { box-shadow: 0 0 0 0 rgba(255,68,68,0); }
         }
 
+        .timer-display {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 5px;
+            font-family: monospace;
+            background: rgba(0,0,0,0.3);
+            padding: 5px 15px;
+            border-radius: 30px;
+            letter-spacing: 2px;
+        }
+
         .sos-text {
             font-size: 70px;
             font-weight: 900;
             margin-bottom: 8px;
             text-shadow: 3px 3px 0 rgba(0,0,0,0.2);
+            line-height: 1;
         }
 
         .sos-engaged {
@@ -331,6 +345,25 @@
             text-align: center;
             padding: 0 10px;
             line-height: 1.3;
+        }
+
+        .location-counter-badge {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            background: #ff4d4d;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+            border: 3px solid white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            z-index: 10;
         }
 
         .status-message {
@@ -359,7 +392,21 @@
             flex-shrink: 0;
         }
 
-        /* Announcement Section - replaced Kasaysayan */
+        .location-stats {
+            font-size: 11px;
+            color: #666;
+            text-align: center;
+            margin: 2px 0 4px;
+            padding: 4px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border-left: 3px solid #ff4d4d;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Announcement Section */
         .announcement-section {
             flex-shrink: 0;
             margin-top: 5px;
@@ -478,15 +525,21 @@
                 
                 <div class="sos-button-container">
                     <button id="sosButton" class="sos-button">
+                        <div class="timer-display" id="sosTimer">00:00:00</div>
                         <span class="sos-text">SOS</span>
                         <span class="sos-instruction">Pindutin kung may emergency</span>
                     </button>
+                    <div id="locationCounter" class="location-counter-badge hidden">0</div>
                 </div>
                 
                 <div id="sosStatus" class="status-message"></div>
+                <div class="location-stats" id="locationStats">
+                    <span id="locationCount">📍 Updates: 0</span>
+                    <span id="lastUpdateTime">⏱️ Last: --:--</span>
+                </div>
                 <div id="locationNote" class="location-note">📍 Ibahagi ang location</div>
                 
-                <!-- Announcement Section - replaces Kasaysayan -->
+                <!-- Announcement Section -->
                 <div class="announcement-section">
                     <div class="announcement-title">
                         <span>📢 Announcement</span>
@@ -515,6 +568,7 @@
 
         const USERS_COLLECTION = 'registered_users';
         const EMERGENCIES_COLLECTION = 'emergencies';
+        const LOCATION_HISTORY_COLLECTION = 'location_history';
         const CODES_COLLECTION = 'registration_codes';
         const GROUPS_COLLECTION = 'groups';
 
@@ -522,6 +576,11 @@
         let watchId = null;
         let currentEmergencyId = null;
         let currentUser = null;
+        let locationUpdateCount = 0;
+        let timerInterval = null;
+        let sosStartTime = null;
+        let lastLocationUpdate = null;
+        let backgroundSyncInterval = null;
 
         auth.onAuthStateChanged(async (user) => {
             if (user) {
@@ -548,10 +607,33 @@
         function resetSOSButton() {
             isSOSActive = false;
             currentEmergencyId = null;
+            locationUpdateCount = 0;
+            sosStartTime = null;
+            lastLocationUpdate = null;
+            
+            // Stop timer
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            
+            // Stop background sync
+            if (backgroundSyncInterval) {
+                clearInterval(backgroundSyncInterval);
+                backgroundSyncInterval = null;
+            }
+            
+            // Reset UI
             sosButton.classList.remove('active');
             document.querySelector('.sos-instruction').innerHTML = 'Pindutin kung may emergency';
             document.getElementById('sosStatus').innerHTML = '';
             document.getElementById('locationNote').innerHTML = '📍 Ibahagi ang location';
+            document.getElementById('locationCounter').classList.add('hidden');
+            document.getElementById('locationCounter').textContent = '0';
+            document.getElementById('locationCount').textContent = '📍 Updates: 0';
+            document.getElementById('lastUpdateTime').textContent = '⏱️ Last: --:--';
+            document.getElementById('sosTimer').textContent = '00:00:00';
+            
             stopTracking();
         }
 
@@ -628,7 +710,25 @@
             }
         });
 
-        // Location request - direct from user gesture
+        // Timer function
+        function startTimer() {
+            sosStartTime = new Date();
+            timerInterval = setInterval(() => {
+                if (!sosStartTime) return;
+                
+                const now = new Date();
+                const diff = Math.floor((now - sosStartTime) / 1000);
+                
+                const hours = Math.floor(diff / 3600);
+                const minutes = Math.floor((diff % 3600) / 60);
+                const seconds = diff % 60;
+                
+                document.getElementById('sosTimer').textContent = 
+                    `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }, 1000);
+        }
+
+        // Location request
         function requestLocation() {
             return new Promise((resolve, reject) => {
                 if (!navigator.geolocation) {
@@ -643,23 +743,91 @@
             });
         }
 
+        // Update location with counter
+        async function updateLocation(emergencyId, position) {
+            try {
+                locationUpdateCount++;
+                const timestamp = firebase.firestore.FieldValue.serverTimestamp();
+                
+                // Update main emergency document with latest location
+                await db.collection(EMERGENCIES_COLLECTION).doc(emergencyId).update({
+                    currentLocation: {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude,
+                        accuracy: position.coords.accuracy,
+                        updateNumber: locationUpdateCount
+                    },
+                    lastUpdate: timestamp
+                });
+
+                // Add to location history with sequence number
+                await db.collection(LOCATION_HISTORY_COLLECTION).add({
+                    emergencyId: emergencyId,
+                    userId: auth.currentUser.uid,
+                    sequence: locationUpdateCount,
+                    location: {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude,
+                        accuracy: position.coords.accuracy
+                    },
+                    timestamp: timestamp
+                });
+
+                // Update UI
+                lastLocationUpdate = new Date();
+                document.getElementById('locationCounter').textContent = locationUpdateCount;
+                document.getElementById('locationCount').textContent = `📍 Updates: ${locationUpdateCount}`;
+                document.getElementById('lastUpdateTime').textContent = 
+                    `⏱️ Last: ${lastLocationUpdate.toLocaleTimeString()}`;
+                document.getElementById('locationNote').innerHTML = 
+                    `📍 Location #${locationUpdateCount} shared`;
+                
+            } catch (error) {
+                console.error('Location update failed:', error);
+            }
+        }
+
+        // Start tracking with 1-minute intervals
         function startTracking(emergencyId) {
             if (!navigator.geolocation) return;
             
-            watchId = navigator.geolocation.watchPosition(
-                async (position) => {
-                    if (emergencyId) {
-                        await db.collection(EMERGENCIES_COLLECTION).doc(emergencyId).update({
-                            location: {
-                                lat: position.coords.latitude,
-                                lng: position.coords.longitude
-                            },
-                            lastUpdate: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                    }
-                },
+            // Get location immediately
+            navigator.geolocation.getCurrentPosition(
+                (position) => updateLocation(emergencyId, position),
                 () => {},
                 { enableHighAccuracy: true }
+            );
+            
+            // Set up 1-minute interval for location updates
+            backgroundSyncInterval = setInterval(() => {
+                if (emergencyId) {
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => updateLocation(emergencyId, position),
+                        () => {
+                            // If location fails, still increment counter for tracking attempt
+                            locationUpdateCount++;
+                            document.getElementById('locationCounter').textContent = locationUpdateCount;
+                            document.getElementById('locationCount').textContent = `📍 Updates: ${locationUpdateCount}`;
+                            document.getElementById('locationNote').innerHTML = 
+                                `⚠️ Location #${locationUpdateCount} failed`;
+                        },
+                        { 
+                            enableHighAccuracy: true,
+                            timeout: 30000,
+                            maximumAge: 0
+                        }
+                    );
+                }
+            }, 60000); // 1 minute interval
+            
+            // Also use watchPosition for background updates (less reliable)
+            watchId = navigator.geolocation.watchPosition(
+                (position) => updateLocation(emergencyId, position),
+                () => {},
+                { 
+                    enableHighAccuracy: true,
+                    maximumAge: 30000
+                }
             );
         }
 
@@ -667,6 +835,10 @@
             if (watchId) {
                 navigator.geolocation.clearWatch(watchId);
                 watchId = null;
+            }
+            if (backgroundSyncInterval) {
+                clearInterval(backgroundSyncInterval);
+                backgroundSyncInterval = null;
             }
         }
 
@@ -679,8 +851,18 @@
             if (isSOSActive) {
                 // STOP Pressed
                 stopTracking();
+                
+                // Mark emergency as completed with final location count
+                if (currentEmergencyId) {
+                    await db.collection(EMERGENCIES_COLLECTION).doc(currentEmergencyId).update({
+                        status: 'completed',
+                        endedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        totalLocationUpdates: locationUpdateCount
+                    });
+                }
+                
                 resetSOSButton();
-                statusDiv.innerHTML = '✅ Tracking stopped';
+                statusDiv.innerHTML = '✅ SOS Stopped - Emergency ended';
                 statusDiv.className = 'status-message info';
                 
             } else {
@@ -690,7 +872,7 @@
                 locationNote.innerHTML = '📍 Please allow location';
                 
                 try {
-                    // Request location FIRST - this triggers Safari popup
+                    // Request location first
                     const position = await requestLocation();
                     
                     const user = auth.currentUser;
@@ -699,7 +881,7 @@
                     const userDoc = await db.collection(USERS_COLLECTION).doc(user.uid).get();
                     const userData = userDoc.data();
 
-                    // Send SOS with location
+                    // Send SOS with initial location
                     const emergencyData = {
                         userId: user.uid,
                         userName: `${userData.firstName} ${userData.lastName}`,
@@ -708,22 +890,51 @@
                         groupName: userData.groupName,
                         timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                         status: 'active',
-                        location: {
+                        initialLocation: {
                             lat: position.coords.latitude,
-                            lng: position.coords.longitude
+                            lng: position.coords.longitude,
+                            accuracy: position.coords.accuracy
+                        },
+                        currentLocation: {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude,
+                            accuracy: position.coords.accuracy,
+                            updateNumber: 1
                         }
                     };
 
                     const docRef = await db.collection(EMERGENCIES_COLLECTION).add(emergencyData);
                     currentEmergencyId = docRef.id;
 
+                    // Add initial location to history
+                    await db.collection(LOCATION_HISTORY_COLLECTION).add({
+                        emergencyId: currentEmergencyId,
+                        userId: user.uid,
+                        sequence: 1,
+                        location: {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude,
+                            accuracy: position.coords.accuracy
+                        },
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
                     // Update UI
                     isSOSActive = true;
+                    locationUpdateCount = 1;
+                    sosStartTime = new Date();
+                    
                     sosButton.classList.add('active');
                     document.querySelector('.sos-instruction').innerHTML = '<span class="sos-engaged">ENGAGED</span><br><span class="sos-press-to-stop">PRESS TO STOP</span>';
-                    statusDiv.innerHTML = '✅ SOS Active - Location shared';
-                    locationNote.innerHTML = '📍 Location shared';
+                    document.getElementById('locationCounter').classList.remove('hidden');
+                    document.getElementById('locationCounter').textContent = '1';
+                    document.getElementById('locationCount').textContent = '📍 Updates: 1';
+                    document.getElementById('lastUpdateTime').textContent = 
+                        `⏱️ Last: ${new Date().toLocaleTimeString()}`;
+                    statusDiv.innerHTML = '✅ SOS Active - Location tracking every 1 minute';
+                    locationNote.innerHTML = '📍 Location #1 shared';
                     
+                    startTimer();
                     startTracking(currentEmergencyId);
                     
                 } catch (error) {
@@ -743,17 +954,22 @@
                                 groupId: userData.groupId,
                                 groupName: userData.groupName,
                                 timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                                status: 'active'
+                                status: 'active',
+                                locationPermission: false
                             };
 
                             const docRef = await db.collection(EMERGENCIES_COLLECTION).add(emergencyData);
                             currentEmergencyId = docRef.id;
 
                             isSOSActive = true;
+                            sosStartTime = new Date();
+                            
                             sosButton.classList.add('active');
                             document.querySelector('.sos-instruction').innerHTML = '<span class="sos-engaged">ENGAGED</span><br><span class="sos-press-to-stop">PRESS TO STOP</span>';
-                            statusDiv.innerHTML = '✅ SOS Active - No location';
+                            statusDiv.innerHTML = '✅ SOS Active - No location permission';
                             locationNote.innerHTML = '📍 Location denied';
+                            
+                            startTimer();
                             
                         } catch (firebaseError) {
                             statusDiv.innerHTML = '❌ SOS Failed';
@@ -768,6 +984,11 @@
                 }
             }
         });
+
+        // Request notification permission for background updates (optional)
+        if ('Notification' in window) {
+            Notification.requestPermission();
+        }
     </script>
 </body>
 </html>
