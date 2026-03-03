@@ -52,7 +52,6 @@
             }
         }
 
-        /* Landing Page Container - Scrollable */
         .container {
             max-width: 400px;
             width: 100%;
@@ -202,7 +201,6 @@
             font-weight: 600;
         }
 
-        /* SOS Page - HUGE BUTTON */
         .sos-page {
             display: none;
             max-width: 400px;
@@ -277,7 +275,6 @@
             position: relative;
         }
 
-        /* HUGE SOS BUTTON */
         .sos-button {
             width: 280px;
             height: 280px;
@@ -410,21 +407,8 @@
             font-size: 10px;
             color: #ff4d4d;
             font-weight: 600;
-            text-align: center;
-            margin: 2px 0;
         }
 
-        .coordinates {
-            font-size: 10px;
-            color: #666;
-            background: #f0f0f0;
-            padding: 4px;
-            border-radius: 4px;
-            margin-top: 2px;
-            word-break: break-all;
-        }
-
-        /* Announcement Section */
         .announcement-section {
             flex-shrink: 0;
             margin-top: 5px;
@@ -529,7 +513,7 @@
             </div>
         </div>
 
-        <!-- SOS Page - HUGE BUTTON with Announcement -->
+        <!-- SOS Page -->
         <div id="sosPage" class="sos-page">
             <div class="sos-header">
                 <span class="sos-logo">DIMAX Emergency</span>
@@ -556,10 +540,8 @@
                     <span id="lastUpdateTime">⏱️ Last: --:--</span>
                 </div>
                 <div id="nextUpdateTimer" class="next-update hidden"></div>
-                <div id="coordinates" class="coordinates hidden"></div>
                 <div id="locationNote" class="location-note">📍 Ibahagi ang location</div>
                 
-                <!-- Announcement Section -->
                 <div class="announcement-section">
                     <div class="announcement-title">
                         <span>📢 Announcement</span>
@@ -607,31 +589,26 @@
 
         auth.onAuthStateChanged(async (user) => {
             if (user) {
-                // Check if user has an active emergency
                 const activeEmergencies = await db.collection(EMERGENCIES_COLLECTION)
                     .where('userId', '==', user.uid)
                     .where('status', '==', 'active')
                     .get();
                 
                 if (!activeEmergencies.empty) {
-                    // User has an active emergency, restore state
                     const emergencyDoc = activeEmergencies.docs[0];
                     currentEmergencyId = emergencyDoc.id;
                     isSOSActive = true;
                     
-                    // Get location history count
                     const historyCount = await db.collection(LOCATION_HISTORY_COLLECTION)
                         .where('emergencyId', '==', currentEmergencyId)
                         .get();
                     locationUpdateCount = historyCount.size;
                     
-                    // Restore timer from emergency start time
                     const emergencyData = emergencyDoc.data();
                     if (emergencyData.timestamp) {
                         sosStartTime = emergencyData.timestamp.toDate();
                     }
                     
-                    // Get last location
                     if (emergencyData.currentLocation) {
                         lastLocationPosition = emergencyData.currentLocation;
                     }
@@ -656,7 +633,6 @@
             }
             
             if (isSOSActive) {
-                // Restore SOS active state
                 sosButton.classList.add('active');
                 document.querySelector('.sos-instruction').innerHTML = '<span class="sos-engaged">ENGAGED</span><br><span class="sos-press-to-stop">PRESS TO STOP</span>';
                 document.getElementById('locationCounter').classList.remove('hidden');
@@ -675,7 +651,6 @@
                     startTimer();
                 }
                 
-                // Start the 1-minute update cycle
                 startOneMinuteUpdates(currentEmergencyId);
             } else {
                 resetSOSButton();
@@ -691,7 +666,6 @@
             lastLocationPosition = null;
             isProcessing = false;
             
-            // Stop all intervals
             if (timerInterval) {
                 clearInterval(timerInterval);
                 timerInterval = null;
@@ -707,10 +681,8 @@
                 nextUpdateTimer = null;
             }
             
-            // Stop tracking
             stopTracking();
             
-            // Reset UI
             sosButton.classList.remove('active');
             document.querySelector('.sos-instruction').innerHTML = 'Pindutin kung may emergency';
             document.getElementById('sosStatus').innerHTML = '';
@@ -721,7 +693,6 @@
             document.getElementById('lastUpdateTime').textContent = '⏱️ Last: --:--';
             document.getElementById('sosTimer').textContent = '00:00:00';
             document.getElementById('nextUpdateTimer').classList.add('hidden');
-            document.getElementById('coordinates').classList.add('hidden');
         }
 
         function showLandingPage() {
@@ -754,50 +725,130 @@
             }
         });
 
-        // Register
+        // ===== COMPLETELY FIXED REGISTRATION =====
         document.getElementById('registerFormElement').addEventListener('submit', async (e) => {
             e.preventDefault();
+            
+            const registerMsg = document.getElementById('registerMessage');
+            registerMsg.innerHTML = '⏳ Processing...';
+            registerMsg.className = 'message info';
+            
+            const firstName = document.getElementById('firstName').value;
+            const lastName = document.getElementById('lastName').value;
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPassword').value;
+            const contactNumber = document.getElementById('contactNumber').value;
+            const regCode = document.getElementById('regCode').value;
+            
             try {
+                console.log('Looking for code:', regCode);
+                
+                // Get ALL codes from Firestore to debug
+                const allCodesSnapshot = await db.collection(CODES_COLLECTION).get();
+                console.log('Total codes in database:', allCodesSnapshot.size);
+                allCodesSnapshot.forEach(doc => {
+                    console.log('Code in DB:', doc.data().code);
+                });
+                
+                // Try to find the code (case insensitive)
                 const codeSnapshot = await db.collection(CODES_COLLECTION)
-                    .where('code', '==', document.getElementById('regCode').value)
-                    .where('used', '==', false)
+                    .where('code', '==', regCode)
                     .get();
 
+                console.log('Code search result:', codeSnapshot.empty ? 'NOT FOUND' : 'FOUND');
+
                 if (codeSnapshot.empty) {
-                    alert('Invalid registration code');
+                    registerMsg.innerHTML = '❌ Invalid registration code. Please check and try again.';
+                    registerMsg.className = 'message error';
                     return;
                 }
 
-                const codeData = codeSnapshot.docs[0].data();
+                const codeDoc = codeSnapshot.docs[0];
+                const codeData = codeDoc.data();
+                
+                console.log('Code data:', codeData);
+                
+                // Check if code has groupId
+                if (!codeData.groupId) {
+                    registerMsg.innerHTML = '❌ Code has no associated group.';
+                    registerMsg.className = 'message error';
+                    return;
+                }
+                
+                // Get group information
                 const groupDoc = await db.collection(GROUPS_COLLECTION).doc(codeData.groupId).get();
                 
-                const userCred = await auth.createUserWithEmailAndPassword(
-                    document.getElementById('regEmail').value,
-                    document.getElementById('regPassword').value
-                );
-
+                if (!groupDoc.exists) {
+                    registerMsg.innerHTML = '❌ Group not found for this code.';
+                    registerMsg.className = 'message error';
+                    return;
+                }
+                
+                console.log('Group found:', groupDoc.data().name);
+                
+                // Create user in Firebase Auth
+                const userCred = await auth.createUserWithEmailAndPassword(email, password);
+                console.log('User created in Auth:', userCred.user.uid);
+                
+                // Save user data in Firestore
                 await db.collection(USERS_COLLECTION).doc(userCred.user.uid).set({
                     userId: userCred.user.uid,
-                    firstName: document.getElementById('firstName').value,
-                    lastName: document.getElementById('lastName').value,
-                    email: document.getElementById('regEmail').value,
-                    contactNumber: document.getElementById('contactNumber').value,
+                    firstName: firstName,
+                    lastName: lastName,
+                    email: email,
+                    contactNumber: contactNumber,
                     groupId: codeData.groupId,
-                    groupName: groupDoc.exists ? groupDoc.data().name : 'Unknown',
-                    registeredAt: firebase.firestore.FieldValue.serverTimestamp()
+                    groupName: groupDoc.data().name,
+                    registeredAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    status: 'active',
+                    registeredWithCode: regCode
                 });
 
-                await codeSnapshot.docs[0].ref.update({
-                    used: true,
-                    usedBy: userCred.user.uid
-                });
+                console.log('User saved to Firestore');
 
+                // Try to update usage count (optional, won't fail if it doesn't work)
+                try {
+                    await codeDoc.ref.update({
+                        lastUsedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        usageCount: firebase.firestore.FieldValue.increment(1)
+                    });
+                } catch (updateError) {
+                    console.log('Usage tracking optional, ignoring error:', updateError);
+                }
+
+                registerMsg.innerHTML = '✅ Registration successful! Logging in...';
+                registerMsg.className = 'message success';
+                
             } catch (error) {
-                document.getElementById('registerMessage').innerHTML = '❌ ' + error.message;
+                console.error('Registration error details:', error);
+                
+                if (error.code === 'auth/email-already-in-use') {
+                    registerMsg.innerHTML = '❌ Email already registered';
+                } else if (error.code === 'auth/weak-password') {
+                    registerMsg.innerHTML = '❌ Password too weak (min 6 characters)';
+                } else if (error.code === 'auth/invalid-email') {
+                    registerMsg.innerHTML = '❌ Invalid email format';
+                } else {
+                    registerMsg.innerHTML = '❌ Registration failed: ' + error.message;
+                }
+                registerMsg.className = 'message error';
             }
         });
 
-        // Timer function
+        function requestLocation() {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    reject(new Error('Geolocation not supported'));
+                    return;
+                }
+                navigator.geolocation.getCurrentPosition(resolve, reject, {
+                    enableHighAccuracy: true,
+                    timeout: 30000,
+                    maximumAge: 0
+                });
+            });
+        }
+
         function startTimer() {
             if (!sosStartTime) {
                 sosStartTime = new Date();
@@ -822,51 +873,16 @@
             }, 1000);
         }
 
-        // Location request with promise
-        function getCurrentLocation() {
-            return new Promise((resolve, reject) => {
-                if (!navigator.geolocation) {
-                    reject(new Error('Geolocation not supported'));
-                    return;
-                }
-                
-                console.log('Requesting location...');
-                
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        console.log('Location received:', position.coords);
-                        resolve(position);
-                    },
-                    (error) => {
-                        console.error('Location error:', error);
-                        reject(error);
-                    },
-                    {
-                        enableHighAccuracy: true,
-                        timeout: 30000,
-                        maximumAge: 0
-                    }
-                );
-            });
-        }
-
-        // Update location with counter
         async function updateLocation(emergencyId) {
-            if (!emergencyId || !isSOSActive) {
-                console.log('Not updating: SOS not active or no emergency ID');
-                return false;
-            }
-            
-            console.log(`Attempting location update #${locationUpdateCount + 1}`);
+            if (!emergencyId || !isSOSActive) return false;
             
             try {
-                const position = await getCurrentLocation();
+                const position = await requestLocation();
                 
-                // Increment counter
                 locationUpdateCount++;
                 const now = new Date();
+                const timestamp = firebase.firestore.FieldValue.serverTimestamp();
                 
-                // Save location data
                 const locationData = {
                     lat: position.coords.latitude,
                     lng: position.coords.longitude,
@@ -876,32 +892,25 @@
                     altitude: position.coords.altitude
                 };
                 
-                console.log(`Saving location #${locationUpdateCount} to Firebase:`, locationData);
-                
-                // Update main emergency document
                 await db.collection(EMERGENCIES_COLLECTION).doc(emergencyId).update({
                     currentLocation: {
                         ...locationData,
                         updateNumber: locationUpdateCount,
                         timestamp: now.toISOString()
                     },
-                    lastUpdate: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastUpdate: timestamp,
                     locationUpdateCount: locationUpdateCount
                 });
 
-                // Add to location history
                 await db.collection(LOCATION_HISTORY_COLLECTION).add({
                     emergencyId: emergencyId,
                     userId: auth.currentUser.uid,
                     sequence: locationUpdateCount,
                     location: locationData,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    timestamp: timestamp,
                     clientTimestamp: now.toISOString()
                 });
 
-                console.log(`Location #${locationUpdateCount} saved successfully`);
-
-                // Update UI
                 lastLocationUpdate = now;
                 lastLocationPosition = locationData;
                 
@@ -912,17 +921,11 @@
                 document.getElementById('locationNote').innerHTML = 
                     `📍 Location #${locationUpdateCount} shared`;
                 
-                // Show coordinates
-                const coordsEl = document.getElementById('coordinates');
-                coordsEl.classList.remove('hidden');
-                coordsEl.innerHTML = `📍 ${locationData.lat.toFixed(6)}, ${locationData.lng.toFixed(6)} (accuracy: ${Math.round(locationData.accuracy)}m)`;
-                
                 return true;
                 
             } catch (error) {
                 console.error('Location update failed:', error);
                 
-                // Still increment counter for failed attempt
                 locationUpdateCount++;
                 document.getElementById('locationCounter').textContent = locationUpdateCount;
                 document.getElementById('locationCount').textContent = `📍 Updates: ${locationUpdateCount}`;
@@ -933,16 +936,9 @@
             }
         }
 
-        // Start 1-minute updates
         function startOneMinuteUpdates(emergencyId) {
-            if (!emergencyId) {
-                console.log('No emergency ID for updates');
-                return;
-            }
+            if (!emergencyId) return;
             
-            console.log('Starting 1-minute location updates for emergency:', emergencyId);
-            
-            // Clear any existing intervals
             if (updateInterval) {
                 clearInterval(updateInterval);
             }
@@ -950,43 +946,29 @@
                 clearInterval(nextUpdateTimer);
             }
             
-            // Show next update timer
             document.getElementById('nextUpdateTimer').classList.remove('hidden');
             
-            // Function to update the countdown
             function updateCountdown() {
                 const now = new Date();
                 const seconds = now.getSeconds();
                 const secondsLeft = 60 - seconds;
-                
                 document.getElementById('nextUpdateTimer').textContent = 
                     `⏱️ Next update in ${secondsLeft} seconds`;
             }
             
-            // Update countdown every second
             nextUpdateTimer = setInterval(updateCountdown, 1000);
             
-            // Do an immediate first update
             setTimeout(() => {
                 if (isSOSActive && emergencyId) {
-                    console.log('Performing initial location update');
                     updateLocation(emergencyId);
                 }
             }, 2000);
             
-            // Then set up interval for every minute
             updateInterval = setInterval(() => {
                 if (isSOSActive && emergencyId) {
-                    console.log('Minute interval triggered - updating location');
                     updateLocation(emergencyId);
-                } else {
-                    console.log('SOS not active, clearing interval');
-                    if (updateInterval) {
-                        clearInterval(updateInterval);
-                        updateInterval = null;
-                    }
                 }
-            }, 60000); // 60,000 ms = 1 minute
+            }, 60000);
         }
 
         function stopTracking() {
@@ -996,15 +978,12 @@
             }
         }
 
-        // SOS Button with debounce
         const sosButton = document.getElementById('sosButton');
         const statusDiv = document.getElementById('sosStatus');
         const locationNote = document.getElementById('locationNote');
 
         sosButton.addEventListener('click', async () => {
-            // Prevent multiple clicks while processing
             if (isProcessing) {
-                console.log('Already processing, ignoring click');
                 return;
             }
             
@@ -1012,12 +991,8 @@
             
             try {
                 if (isSOSActive) {
-                    // STOP Pressed
-                    console.log('Stopping SOS');
-                    
                     stopTracking();
                     
-                    // Clear intervals
                     if (updateInterval) {
                         clearInterval(updateInterval);
                         updateInterval = null;
@@ -1027,7 +1002,6 @@
                         nextUpdateTimer = null;
                     }
                     
-                    // Mark emergency as completed
                     if (currentEmergencyId) {
                         await db.collection(EMERGENCIES_COLLECTION).doc(currentEmergencyId).update({
                             status: 'completed',
@@ -1039,7 +1013,6 @@
                                 updateNumber: locationUpdateCount
                             } : null
                         });
-                        console.log('Emergency marked as completed');
                     }
                     
                     resetSOSButton();
@@ -1047,56 +1020,19 @@
                     statusDiv.className = 'status-message info';
                     
                 } else {
-                    // SOS Pressed
-                    console.log('Starting SOS');
-                    
-                    statusDiv.innerHTML = '📍 Requesting location permission...';
+                    statusDiv.innerHTML = '📍 Asking for location...';
                     statusDiv.className = 'status-message info';
-                    locationNote.innerHTML = '📍 Please allow location access';
+                    locationNote.innerHTML = '📍 Please allow location';
                     
                     try {
+                        const position = await requestLocation();
+                        
                         const user = auth.currentUser;
                         if (!user) throw new Error('Not logged in');
 
-                        // Check for existing active emergency
-                        const activeEmergencies = await db.collection(EMERGENCIES_COLLECTION)
-                            .where('userId', '==', user.uid)
-                            .where('status', '==', 'active')
-                            .get();
-                        
-                        if (!activeEmergencies.empty) {
-                            console.log('Found existing active emergency');
-                            // Use existing emergency
-                            currentEmergencyId = activeEmergencies.docs[0].id;
-                            isSOSActive = true;
-                            
-                            // Get location count
-                            const historyCount = await db.collection(LOCATION_HISTORY_COLLECTION)
-                                .where('emergencyId', '==', currentEmergencyId)
-                                .get();
-                            locationUpdateCount = historyCount.size;
-                            
-                            showSOSPage();
-                            isProcessing = false;
-                            return;
-                        }
-
-                        // Test location permission
-                        try {
-                            await getCurrentLocation();
-                        } catch (locationError) {
-                            if (locationError.code === 1) {
-                                // Permission denied
-                                throw new Error('Location permission denied');
-                            }
-                            // Other location error, continue but will try again
-                        }
-
-                        // Get user data
                         const userDoc = await db.collection(USERS_COLLECTION).doc(user.uid).get();
                         const userData = userDoc.data();
 
-                        // Create emergency document
                         const emergencyData = {
                             userId: user.uid,
                             userName: `${userData.firstName} ${userData.lastName}`,
@@ -1105,35 +1041,61 @@
                             groupName: userData.groupName,
                             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                             status: 'active',
-                            clientTimestamp: new Date().toISOString(),
-                            locationUpdateCount: 0
+                            initialLocation: {
+                                lat: position.coords.latitude,
+                                lng: position.coords.longitude,
+                                accuracy: position.coords.accuracy
+                            },
+                            currentLocation: {
+                                lat: position.coords.latitude,
+                                lng: position.coords.longitude,
+                                accuracy: position.coords.accuracy,
+                                updateNumber: 1
+                            },
+                            locationUpdateCount: 1
                         };
 
-                        console.log('Creating new emergency document');
                         const docRef = await db.collection(EMERGENCIES_COLLECTION).add(emergencyData);
                         currentEmergencyId = docRef.id;
-                        console.log('Emergency created with ID:', currentEmergencyId);
 
-                        // Update UI
+                        await db.collection(LOCATION_HISTORY_COLLECTION).add({
+                            emergencyId: currentEmergencyId,
+                            userId: user.uid,
+                            sequence: 1,
+                            location: {
+                                lat: position.coords.latitude,
+                                lng: position.coords.longitude,
+                                accuracy: position.coords.accuracy
+                            },
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                            clientTimestamp: new Date().toISOString()
+                        });
+
                         isSOSActive = true;
+                        locationUpdateCount = 1;
                         sosStartTime = new Date();
+                        lastLocationUpdate = new Date();
+                        lastLocationPosition = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude,
+                            accuracy: position.coords.accuracy
+                        };
                         
                         sosButton.classList.add('active');
                         document.querySelector('.sos-instruction').innerHTML = '<span class="sos-engaged">ENGAGED</span><br><span class="sos-press-to-stop">PRESS TO STOP</span>';
                         document.getElementById('locationCounter').classList.remove('hidden');
-                        document.getElementById('locationCounter').textContent = '0';
-                        document.getElementById('locationCount').textContent = '📍 Updates: 0';
-                        statusDiv.innerHTML = '✅ SOS Active - Location updates every 1 minute';
-                        locationNote.innerHTML = '📍 Waiting for first location...';
+                        document.getElementById('locationCounter').textContent = '1';
+                        document.getElementById('locationCount').textContent = '📍 Updates: 1';
+                        document.getElementById('lastUpdateTime').textContent = 
+                            `⏱️ Last: ${new Date().toLocaleTimeString()}`;
+                        statusDiv.innerHTML = '✅ SOS Active - Location tracking every 1 minute';
+                        locationNote.innerHTML = '📍 Location #1 shared';
                         
                         startTimer();
                         startOneMinuteUpdates(currentEmergencyId);
                         
                     } catch (error) {
-                        console.error('SOS start error:', error);
-                        
-                        if (error.message === 'Location permission denied') {
-                            // Create SOS without location
+                        if (error.code === 1) {
                             try {
                                 const user = auth.currentUser;
                                 if (!user) throw new Error('Not logged in');
@@ -1149,7 +1111,6 @@
                                     groupName: userData.groupName,
                                     timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                                     status: 'active',
-                                    clientTimestamp: new Date().toISOString(),
                                     locationPermission: false
                                 };
 
@@ -1162,7 +1123,7 @@
                                 sosButton.classList.add('active');
                                 document.querySelector('.sos-instruction').innerHTML = '<span class="sos-engaged">ENGAGED</span><br><span class="sos-press-to-stop">PRESS TO STOP</span>';
                                 statusDiv.innerHTML = '✅ SOS Active - No location permission';
-                                locationNote.innerHTML = '📍 Location denied - Please enable in settings';
+                                locationNote.innerHTML = '📍 Location denied';
                                 document.getElementById('locationCounter').classList.remove('hidden');
                                 document.getElementById('locationCounter').textContent = '0';
                                 
@@ -1174,24 +1135,21 @@
                                 resetSOSButton();
                             }
                         } else {
-                            statusDiv.innerHTML = '❌ Failed to start SOS';
+                            locationNote.innerHTML = '📍 Location unavailable';
+                            statusDiv.innerHTML = '❌ Location error';
                             statusDiv.className = 'status-message error';
-                            resetSOSButton();
                         }
                     }
                 }
             } finally {
-                // Reset processing flag after a delay
                 setTimeout(() => {
                     isProcessing = false;
                 }, 2000);
             }
         });
 
-        // Handle page visibility changes
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible' && isSOSActive && currentEmergencyId) {
-                // Refresh location count when page becomes visible
                 db.collection(LOCATION_HISTORY_COLLECTION)
                     .where('emergencyId', '==', currentEmergencyId)
                     .get()
@@ -1203,7 +1161,6 @@
             }
         });
 
-        // Request notification permission
         if ('Notification' in window) {
             Notification.requestPermission();
         }
