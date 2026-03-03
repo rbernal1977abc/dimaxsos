@@ -11,11 +11,9 @@
     <!-- Leaflet for Maps -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- Leaflet Routing Machine for route tracking -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
-    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+    <!-- Keep all your existing styles exactly the same -->
     <style>
-        /* Keep all your existing styles exactly the same */
+        /* All your existing styles remain unchanged */
         * {
             margin: 0;
             padding: 0;
@@ -1128,6 +1126,32 @@
             color: #666;
         }
 
+        .connection-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 11px;
+            font-weight: bold;
+            z-index: 9999;
+        }
+
+        .connection-status.connected {
+            background: #28a745;
+            color: white;
+        }
+
+        .connection-status.disconnected {
+            background: #dc3545;
+            color: white;
+        }
+
+        .connection-status.reconnecting {
+            background: #ffc107;
+            color: #1a1a2e;
+        }
+
         @keyframes slideIn {
             from {
                 opacity: 0;
@@ -1196,6 +1220,9 @@
     </style>
 </head>
 <body>
+    <!-- Add connection status indicator -->
+    <div id="connectionStatus" class="connection-status connected">🟢 Connected</div>
+
     <!-- Admin Login -->
     <div id="loginContainer" class="login-container">
         <h2>DIMAX Admin Login</h2>
@@ -1571,10 +1598,30 @@
             measurementId: "G-044SM39EQ7"
         };
 
-        // Initialize Firebase
+        // Initialize Firebase with custom settings for better real-time
         firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
+        
+        // Configure Firestore for better real-time performance
         const db = firebase.firestore();
+        db.settings({
+            cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED,
+            ignoreUndefinedProperties: true,
+            merge: true
+        });
+        
+        // Enable persistence for offline support
+        db.enablePersistence({
+            synchronizeTabs: true,
+            experimentalForceOwningTab: true
+        }).catch((err) => {
+            if (err.code === 'failed-precondition') {
+                console.log('Multiple tabs open, persistence enabled in one tab only');
+            } else if (err.code === 'unimplemented') {
+                console.log('Browser doesn\'t support persistence');
+            }
+        });
+
+        const auth = firebase.auth();
 
         // Collections
         const USERS_COLLECTION = 'registered_users';
@@ -1595,14 +1642,20 @@
         let currentFilter = 'all';
         let selectedGroupId = null;
         
-        // Audio for alerts - use multiple sources for reliability
-        const alertSound1 = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
-        const alertSound2 = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
-        let currentSound = 0;
+        // Audio for alerts
+        const alertSound = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
+        alertSound.volume = 0.7;
         
         // Keep track of processed emergencies to avoid duplicates
         let processedEmergencies = new Set();
         let activeLocationListeners = new Map(); // Track location listeners per emergency
+        let emergencyUnsubscribers = new Map(); // Track emergency listeners
+
+        // Connection status
+        let connectionStatus = document.getElementById('connectionStatus');
+        let reconnectAttempts = 0;
+        let forceRefreshInterval = null;
+        let lastEmergencyCount = 0;
 
         // Check authentication
         auth.onAuthStateChanged(async (user) => {
@@ -1624,11 +1677,14 @@
                         
                         initMap();
                         
-                        // Load initial emergencies
-                        await loadInitialEmergencies();
+                        // Force immediate refresh every 5 seconds as backup
+                        startForceRefresh();
                         
-                        // Setup real-time listeners
-                        setupRealtimeEmergenciesListener();
+                        // Setup aggressive real-time listeners
+                        setupAggressiveRealTimeListener();
+                        
+                        // Load initial data
+                        await loadInitialEmergencies();
                         
                         loadStats();
                         loadGroups();
@@ -1636,6 +1692,9 @@
                         loadCodes();
                         loadAdmins();
                         loadGroupSelects();
+                        
+                        // Monitor connection state
+                        monitorConnection();
                     } else {
                         console.log('Admin document not found, creating automatically...');
                         
@@ -1679,8 +1738,73 @@
             } else {
                 document.getElementById('loginContainer').style.display = 'block';
                 document.getElementById('dashboard').style.display = 'none';
+                stopForceRefresh();
             }
         });
+
+        // Start force refresh interval
+        function startForceRefresh() {
+            if (forceRefreshInterval) {
+                clearInterval(forceRefreshInterval);
+            }
+            
+            // Force refresh every 3 seconds as backup
+            forceRefreshInterval = setInterval(async () => {
+                // Check if we have any active emergencies
+                const activeCount = document.querySelectorAll('.emergency-item.active-alarms').length;
+                
+                // Also check via Firebase directly
+                try {
+                    const snapshot = await db.collection(EMERGENCIES_COLLECTION)
+                        .where('status', 'in', ['active', 'in-progress'])
+                        .get();
+                    
+                    const currentCount = snapshot.size;
+                    
+                    // If count changed or we have active emergencies not showing, force refresh
+                    if (currentCount !== lastEmergencyCount) {
+                        console.log('Emergency count changed, refreshing...');
+                        lastEmergencyCount = currentCount;
+                        await refreshEmergenciesForce();
+                    }
+                } catch (error) {
+                    console.log('Force refresh check error:', error);
+                }
+            }, 3000); // Check every 3 seconds
+        }
+
+        // Stop force refresh
+        function stopForceRefresh() {
+            if (forceRefreshInterval) {
+                clearInterval(forceRefreshInterval);
+                forceRefreshInterval = null;
+            }
+        }
+
+        // Monitor Firestore connection
+        function monitorConnection() {
+            db.collection('__health__').doc('health').onSnapshot({
+                next: () => {
+                    connectionStatus.textContent = '🟢 Connected';
+                    connectionStatus.className = 'connection-status connected';
+                    reconnectAttempts = 0;
+                },
+                error: (error) => {
+                    console.log('Connection error:', error);
+                    connectionStatus.textContent = '🔴 Disconnected - Reconnecting...';
+                    connectionStatus.className = 'connection-status disconnected';
+                    
+                    // Try to reconnect
+                    reconnectAttempts++;
+                    if (reconnectAttempts > 3) {
+                        // Force page refresh after multiple failures
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 5000);
+                    }
+                }
+            });
+        }
 
         // Login handler
         document.getElementById('adminLoginForm').addEventListener('submit', async (e) => {
@@ -1699,6 +1823,7 @@
 
         // Logout
         document.getElementById('logoutBtn').addEventListener('click', async () => {
+            stopForceRefresh();
             await auth.signOut();
         });
 
@@ -1736,6 +1861,9 @@
                 setTimeout(() => {
                     if (map) map.invalidateSize();
                 }, 100);
+                
+                // Force refresh when switching to emergencies tab
+                refreshEmergenciesForce();
             } else if (tab === 'users-groups') {
                 tabs[1].classList.add('active');
                 document.getElementById('usersGroupsTab').classList.add('active');
@@ -1792,41 +1920,156 @@
             }
         };
 
-        // Play alert sound with better reliability
+        // Play alert sound
         function playAlertSound() {
             if (!soundEnabled) return;
             
             try {
-                // Try multiple sound sources
-                const audio = new Audio();
-                audio.volume = 0.7;
-                
-                // Use multiple sources for reliability
-                const soundSources = [
-                    'https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3',
-                    'https://www.soundjay.com/misc/sounds/bell-ringing-01.mp3',
-                    'https://www.soundjay.com/misc/sounds/bell-ringing-02.mp3'
-                ];
-                
-                audio.src = soundSources[Math.floor(Math.random() * soundSources.length)];
-                
-                // Play with promise catch
-                audio.play().catch(e => {
-                    console.log('Audio play failed, trying alternative:', e);
-                    // Try alternative sound
-                    setTimeout(() => {
-                        const altAudio = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-01.mp3');
-                        altAudio.volume = 0.7;
-                        altAudio.play().catch(e2 => console.log('Alternative sound also failed:', e2));
-                    }, 100);
-                });
+                // Clone the audio to allow overlapping plays
+                const sound = alertSound.cloneNode();
+                sound.volume = 0.7;
+                sound.play().catch(e => console.log('Audio play failed:', e));
             } catch (error) {
                 console.log('Sound error:', error);
             }
         }
 
-        // Load initial emergencies
-        async function loadInitialEmergencies() {
+        // Setup aggressive real-time listener
+        function setupAggressiveRealTimeListener() {
+            // Listen to all emergencies with no cache
+            const unsubscribe = db.collection(EMERGENCIES_COLLECTION)
+                .orderBy('timestamp', 'desc')
+                .onSnapshot({
+                    next: (snapshot) => {
+                        console.log('Real-time update received, changes:', snapshot.docChanges().length);
+                        connectionStatus.textContent = '🟢 Connected';
+                        connectionStatus.className = 'connection-status connected';
+                        
+                        // Process each change
+                        snapshot.docChanges().forEach(change => {
+                            const emergency = change.doc.data();
+                            emergency.id = change.doc.id;
+                            
+                            if (change.type === 'added') {
+                                console.log('New emergency added:', emergency.id);
+                                handleNewEmergency(emergency);
+                            } else if (change.type === 'modified') {
+                                console.log('Emergency modified:', emergency.id);
+                                handleEmergencyUpdate(emergency);
+                            } else if (change.type === 'removed') {
+                                console.log('Emergency removed:', emergency.id);
+                                handleEmergencyRemoval(emergency.id);
+                            }
+                        });
+                        
+                        // Update last emergency count
+                        lastEmergencyCount = snapshot.size;
+                    },
+                    error: (error) => {
+                        console.error('Real-time listener error:', error);
+                        connectionStatus.textContent = '🔴 Connection Lost - Retrying...';
+                        connectionStatus.className = 'connection-status reconnecting';
+                        
+                        // Attempt to reconnect after 2 seconds
+                        setTimeout(() => {
+                            setupAggressiveRealTimeListener();
+                        }, 2000);
+                    }
+                }, { includeMetadataChanges: true });
+            
+            // Store unsubscribe function
+            emergencyUnsubscribers.set('main', unsubscribe);
+        }
+
+        // Handle new emergency
+        async function handleNewEmergency(emergency) {
+            if (processedEmergencies.has(emergency.id)) return;
+            
+            processedEmergencies.add(emergency.id);
+            
+            // Get latest location
+            try {
+                const locationSnapshot = await db.collection(LOCATION_HISTORY_COLLECTION)
+                    .where('emergencyId', '==', emergency.id)
+                    .orderBy('sequence', 'desc')
+                    .limit(1)
+                    .get();
+                
+                if (!locationSnapshot.empty) {
+                    const latestLocation = locationSnapshot.docs[0].data();
+                    emergency.currentLocation = latestLocation.location;
+                    emergency.locationUpdateCount = latestLocation.sequence;
+                }
+            } catch (locError) {
+                console.log('No location history for new emergency:', emergency.id);
+            }
+            
+            // Play sound for active emergencies
+            if (emergency.status === 'active') {
+                playAlertSound();
+            }
+            
+            // Add to list if matches filter
+            if (currentFilter === 'all' || emergency.status === currentFilter) {
+                addEmergencyToList(emergency);
+            }
+            
+            // Set up location listener if active
+            if (emergency.status === 'active' || emergency.status === 'in-progress') {
+                setupLocationListener(emergency.id);
+            }
+            
+            // Update stats
+            loadStats();
+        }
+
+        // Handle emergency update
+        async function handleEmergencyUpdate(emergency) {
+            // Get latest location
+            try {
+                const locationSnapshot = await db.collection(LOCATION_HISTORY_COLLECTION)
+                    .where('emergencyId', '==', emergency.id)
+                    .orderBy('sequence', 'desc')
+                    .limit(1)
+                    .get();
+                
+                if (!locationSnapshot.empty) {
+                    const latestLocation = locationSnapshot.docs[0].data();
+                    emergency.currentLocation = latestLocation.location;
+                    emergency.locationUpdateCount = latestLocation.sequence;
+                }
+            } catch (locError) {
+                console.log('No location history for emergency update:', emergency.id);
+            }
+            
+            // Update in list
+            updateEmergencyInList(emergency);
+            
+            if (emergency.status === 'completed') {
+                // Remove location listener if completed
+                removeLocationListener(emergency.id);
+                
+                // Remove marker
+                if (mapMarkers[emergency.id]) {
+                    map.removeLayer(mapMarkers[emergency.id]);
+                    delete mapMarkers[emergency.id];
+                }
+            }
+        }
+
+        // Handle emergency removal
+        function handleEmergencyRemoval(emergencyId) {
+            removeEmergencyFromList(emergencyId);
+            removeLocationListener(emergencyId);
+            
+            if (mapMarkers[emergencyId]) {
+                map.removeLayer(mapMarkers[emergencyId]);
+                delete mapMarkers[emergencyId];
+            }
+        }
+
+        // Force refresh emergencies
+        async function refreshEmergenciesForce() {
             try {
                 const snapshot = await db.collection(EMERGENCIES_COLLECTION)
                     .orderBy('timestamp', 'desc')
@@ -1835,18 +2078,13 @@
                 const emergenciesList = document.getElementById('emergenciesList');
                 emergenciesList.innerHTML = '';
                 
-                let filteredEmergencies = [];
                 let emergencyCount = 0;
                 
-                // Process each emergency
                 for (const doc of snapshot.docs) {
                     const emergency = doc.data();
                     emergency.id = doc.id;
                     
-                    // Add to processed set to prevent duplicate sounds
-                    processedEmergencies.add(emergency.id);
-                    
-                    // Get latest location from location history
+                    // Get latest location
                     try {
                         const locationSnapshot = await db.collection(LOCATION_HISTORY_COLLECTION)
                             .where('emergencyId', '==', emergency.id)
@@ -1865,165 +2103,30 @@
                     
                     // Apply filter
                     if (currentFilter === 'all' || emergency.status === currentFilter) {
-                        filteredEmergencies.push(emergency);
                         emergencyCount++;
-                        
                         const emergencyItem = createEmergencyItem(emergency);
                         emergenciesList.appendChild(emergencyItem);
                         
-                        // Add marker to map for active/in-progress
+                        // Update marker
                         if (emergency.currentLocation && (emergency.status === 'active' || emergency.status === 'in-progress')) {
                             updateEmergencyMarker(emergency.id, emergency);
                         }
-                    }
-                    
-                    // Setup location listener for active emergencies
-                    if (emergency.status === 'active' || emergency.status === 'in-progress') {
-                        setupLocationListener(emergency.id);
                     }
                 }
                 
                 document.getElementById('emergencyCount').textContent = emergencyCount;
                 
-                if (filteredEmergencies.length === 0) {
+                if (emergencyCount === 0) {
                     emergenciesList.innerHTML = '<p style="text-align: center; padding: 20px;">No emergencies found</p>';
-                    if (currentFilter !== 'completed') {
-                        clearMarkersAndRoute();
-                        document.getElementById('selectedEmergencyInfo').innerHTML = '<h4>Select an emergency to view details</h4>';
-                    }
                 }
             } catch (error) {
-                console.error('Error loading emergencies:', error);
-                document.getElementById('emergenciesList').innerHTML = '<p style="text-align: center; padding: 20px; color: red;">Error loading emergencies</p>';
+                console.error('Force refresh error:', error);
             }
         }
 
-        // Setup real-time emergencies listener
-        function setupRealtimeEmergenciesListener() {
-            // Listen to emergencies collection in real-time
-            db.collection(EMERGENCIES_COLLECTION)
-                .orderBy('timestamp', 'desc')
-                .onSnapshot((snapshot) => {
-                    // Process changes
-                    snapshot.docChanges().forEach(async (change) => {
-                        const emergency = change.doc.data();
-                        emergency.id = change.doc.id;
-                        
-                        if (change.type === 'added') {
-                            // New emergency added
-                            if (!processedEmergencies.has(emergency.id)) {
-                                processedEmergencies.add(emergency.id);
-                                
-                                // Only play sound for active emergencies
-                                if (emergency.status === 'active') {
-                                    playAlertSound();
-                                }
-                                
-                                // Get latest location
-                                try {
-                                    const locationSnapshot = await db.collection(LOCATION_HISTORY_COLLECTION)
-                                        .where('emergencyId', '==', emergency.id)
-                                        .orderBy('sequence', 'desc')
-                                        .limit(1)
-                                        .get();
-                                    
-                                    if (!locationSnapshot.empty) {
-                                        const latestLocation = locationSnapshot.docs[0].data();
-                                        emergency.currentLocation = latestLocation.location;
-                                        emergency.locationUpdateCount = latestLocation.sequence;
-                                    }
-                                } catch (locError) {
-                                    console.log('No location history for new emergency:', emergency.id);
-                                }
-                                
-                                // Add to list if matches filter
-                                if (currentFilter === 'all' || emergency.status === currentFilter) {
-                                    addEmergencyToList(emergency);
-                                }
-                                
-                                // Set up location listener if active
-                                if (emergency.status === 'active' || emergency.status === 'in-progress') {
-                                    setupLocationListener(emergency.id);
-                                }
-                                
-                                // Update stats
-                                loadStats();
-                            }
-                        } else if (change.type === 'modified') {
-                            // Emergency updated
-                            updateEmergencyInList(emergency);
-                            
-                            if (emergency.status === 'completed') {
-                                // Remove location listener if completed
-                                removeLocationListener(emergency.id);
-                                
-                                // Remove marker
-                                if (mapMarkers[emergency.id]) {
-                                    map.removeLayer(mapMarkers[emergency.id]);
-                                    delete mapMarkers[emergency.id];
-                                }
-                            }
-                        } else if (change.type === 'removed') {
-                            // Emergency deleted
-                            removeEmergencyFromList(emergency.id);
-                            removeLocationListener(emergency.id);
-                            if (mapMarkers[emergency.id]) {
-                                map.removeLayer(mapMarkers[emergency.id]);
-                                delete mapMarkers[emergency.id];
-                            }
-                        }
-                    });
-                });
-        }
-
-        // Add emergency to list
-        function addEmergencyToList(emergency) {
-            const emergenciesList = document.getElementById('emergenciesList');
-            const emergencyItem = createEmergencyItem(emergency);
-            
-            // Add with animation
-            emergencyItem.classList.add('new-emergency');
-            emergenciesList.insertBefore(emergencyItem, emergenciesList.firstChild);
-            
-            // Update count
-            const currentCount = parseInt(document.getElementById('emergencyCount').textContent) || 0;
-            document.getElementById('emergencyCount').textContent = currentCount + 1;
-            
-            // Add marker if applicable
-            if (emergency.currentLocation && (emergency.status === 'active' || emergency.status === 'in-progress')) {
-                updateEmergencyMarker(emergency.id, emergency);
-            }
-            
-            // Remove animation class after 3 seconds
-            setTimeout(() => {
-                emergencyItem.classList.remove('new-emergency');
-            }, 3000);
-        }
-
-        // Update emergency in list
-        function updateEmergencyInList(emergency) {
-            const existingItem = document.querySelector(`.emergency-item[data-id="${emergency.id}"]`);
-            if (existingItem) {
-                const newItem = createEmergencyItem(emergency);
-                existingItem.replaceWith(newItem);
-            }
-            
-            // Update marker
-            if (emergency.currentLocation && (emergency.status === 'active' || emergency.status === 'in-progress')) {
-                updateEmergencyMarker(emergency.id, emergency);
-            }
-        }
-
-        // Remove emergency from list
-        function removeEmergencyFromList(emergencyId) {
-            const item = document.querySelector(`.emergency-item[data-id="${emergencyId}"]`);
-            if (item) {
-                item.remove();
-                
-                // Update count
-                const currentCount = parseInt(document.getElementById('emergencyCount').textContent) || 0;
-                document.getElementById('emergencyCount').textContent = Math.max(0, currentCount - 1);
-            }
+        // Load initial emergencies
+        async function loadInitialEmergencies() {
+            await refreshEmergenciesForce();
         }
 
         // Setup real-time location listener for a specific emergency
@@ -2178,6 +2281,46 @@
             `;
         }
 
+        // Add emergency to list
+        function addEmergencyToList(emergency) {
+            const emergenciesList = document.getElementById('emergenciesList');
+            const emergencyItem = createEmergencyItem(emergency);
+            
+            // Add with animation
+            emergencyItem.classList.add('new-emergency');
+            emergenciesList.insertBefore(emergencyItem, emergenciesList.firstChild);
+            
+            // Update count
+            const currentCount = parseInt(document.getElementById('emergencyCount').textContent) || 0;
+            document.getElementById('emergencyCount').textContent = currentCount + 1;
+            
+            // Remove animation class after 3 seconds
+            setTimeout(() => {
+                emergencyItem.classList.remove('new-emergency');
+            }, 3000);
+        }
+
+        // Update emergency in list
+        function updateEmergencyInList(emergency) {
+            const existingItem = document.querySelector(`.emergency-item[data-id="${emergency.id}"]`);
+            if (existingItem) {
+                const newItem = createEmergencyItem(emergency);
+                existingItem.replaceWith(newItem);
+            }
+        }
+
+        // Remove emergency from list
+        function removeEmergencyFromList(emergencyId) {
+            const item = document.querySelector(`.emergency-item[data-id="${emergencyId}"]`);
+            if (item) {
+                item.remove();
+                
+                // Update count
+                const currentCount = parseInt(document.getElementById('emergencyCount').textContent) || 0;
+                document.getElementById('emergencyCount').textContent = Math.max(0, currentCount - 1);
+            }
+        }
+
         // Create emergency item
         function createEmergencyItem(emergency) {
             const div = document.createElement('div');
@@ -2241,6 +2384,29 @@
             
             return div;
         }
+
+        // Select emergency
+        window.selectEmergency = function(emergency) {
+            selectedEmergencyId = emergency.id;
+            
+            // Update selected style
+            document.querySelectorAll('.emergency-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            const selectedItem = document.querySelector(`.emergency-item[data-id="${emergency.id}"]`);
+            if (selectedItem) {
+                selectedItem.classList.add('active');
+            }
+            
+            // Show info
+            showEmergencyInfo(emergency);
+            
+            // Center map on location if available
+            const location = emergency.currentLocation || emergency.location;
+            if (location && map) {
+                map.setView([location.lat, location.lng], 15);
+            }
+        };
 
         // View emergency history
         window.viewEmergencyHistory = async function(emergencyId) {
@@ -2388,29 +2554,6 @@
                 </div>
             `;
         }
-
-        // Select emergency
-        window.selectEmergency = function(emergency) {
-            selectedEmergencyId = emergency.id;
-            
-            // Update selected style
-            document.querySelectorAll('.emergency-item').forEach(item => {
-                item.classList.remove('active');
-            });
-            const selectedItem = document.querySelector(`.emergency-item[data-id="${emergency.id}"]`);
-            if (selectedItem) {
-                selectedItem.classList.add('active');
-            }
-            
-            // Show info
-            showEmergencyInfo(emergency);
-            
-            // Center map on location if available
-            const location = emergency.currentLocation || emergency.location;
-            if (location && map) {
-                map.setView([location.lat, location.lng], 15);
-            }
-        };
 
         // Handle emergency
         window.handleEmergency = async function(emergencyId) {
@@ -3363,10 +3506,6 @@
                 // Active Emergencies
                 const activeSnapshot = await db.collection(EMERGENCIES_COLLECTION).where('status', '==', 'active').get();
                 document.getElementById('activeEmergencies').textContent = activeSnapshot.size;
-                
-                // In Progress Emergencies
-                const inProgressSnapshot = await db.collection(EMERGENCIES_COLLECTION).where('status', '==', 'in-progress').get();
-                document.getElementById('inProgressEmergencies').textContent = inProgressSnapshot.size;
                 
                 // Completed Emergencies
                 const completedSnapshot = await db.collection(EMERGENCIES_COLLECTION).where('status', '==', 'completed').get();
