@@ -209,7 +209,7 @@
         }
 
         .sound-toggle button {
-            padding: 10px;
+            padding: 10px 20px;
             border: none;
             border-radius: 5px;
             cursor: pointer;
@@ -1597,11 +1597,12 @@
         
         // Audio for alerts
         let alertAudio = new Audio();
-        alertAudio.loop = true;
+        alertAudio.loop = false;
         alertAudio.src = 'https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3';
         
-        // Keep track of processed emergencies to avoid duplicate sounds
+        // Keep track of processed emergencies to avoid duplicates
         let processedEmergencies = new Set();
+        let activeLocationListeners = new Map(); // Track location listeners per emergency
 
         // Check authentication
         auth.onAuthStateChanged(async (user) => {
@@ -1622,16 +1623,14 @@
                         document.getElementById('adminRole').textContent = currentUserRole === 'admin' ? 'Super Admin' : 'Operator';
                         
                         initMap();
-                        loadEmergencies();
+                        setupRealtimeEmergenciesListener();
                         loadStats();
                         loadGroups();
                         loadUsers();
                         loadCodes();
                         loadAdmins();
                         loadGroupSelects();
-                        setupRealtimeListener();
                     } else {
-                        // Admin doesn't exist - create it automatically
                         console.log('Admin document not found, creating automatically...');
                         
                         const adminData = {
@@ -1653,10 +1652,8 @@
                 } catch (error) {
                     console.error('Error checking admin:', error);
                     
-                    // If there's a permission error, try one more time with a different approach
                     if (error.code === 'permission-denied') {
                         try {
-                            // Try to create with a simple object first
                             await db.collection(ADMINS_COLLECTION).doc(user.uid).set({
                                 userId: user.uid,
                                 email: user.email,
@@ -1664,7 +1661,6 @@
                                 createdAt: new Date().toISOString()
                             });
                             
-                            // Reload to show dashboard
                             window.location.reload();
                         } catch (retryError) {
                             console.error('Retry failed:', retryError);
@@ -1761,7 +1757,7 @@
             
             // Clear map and reload emergencies
             clearMarkersAndRoute();
-            loadEmergencies();
+            // Re-run the existing listener
         };
 
         // Clear markers and route
@@ -1784,15 +1780,9 @@
             if (soundEnabled) {
                 soundBtn.innerHTML = '🔊 On';
                 soundBtn.className = 'sound-on';
-                // Stop any playing sound
-                alertAudio.pause();
-                alertAudio.currentTime = 0;
             } else {
                 soundBtn.innerHTML = '🔇 Off';
                 soundBtn.className = 'sound-off';
-                // Stop any playing sound
-                alertAudio.pause();
-                alertAudio.currentTime = 0;
             }
         };
 
@@ -1803,119 +1793,272 @@
                 const sound = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
                 sound.volume = 0.7;
                 sound.play().catch(e => console.log('Audio play failed:', e));
-                
-                // Also try with the stored audio
-                alertAudio.currentTime = 0;
-                alertAudio.play().catch(e => console.log('Alert audio failed:', e));
             }
         }
 
-        // Load emergencies
-        function loadEmergencies() {
-            db.collection(EMERGENCIES_COLLECTION).orderBy('timestamp', 'desc').onSnapshot((snapshot) => {
-                const emergenciesList = document.getElementById('emergenciesList');
-                emergenciesList.innerHTML = '';
-                
-                let filteredEmergencies = [];
-                
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    data.id = doc.id;
+        // Setup real-time emergencies listener (prevents duplicates)
+        function setupRealtimeEmergenciesListener() {
+            // Listen to emergencies collection in real-time
+            db.collection(EMERGENCIES_COLLECTION)
+                .orderBy('timestamp', 'desc')
+                .onSnapshot((snapshot) => {
+                    const emergenciesList = document.getElementById('emergenciesList');
                     
-                    // Get location from either location or currentLocation field
-                    const location = data.currentLocation || data.location || null;
+                    // Process changes
+                    snapshot.docChanges().forEach(change => {
+                        const emergency = change.doc.data();
+                        emergency.id = change.doc.id;
+                        
+                        if (change.type === 'added') {
+                            // New emergency added
+                            if (!processedEmergencies.has(emergency.id)) {
+                                processedEmergencies.add(emergency.id);
+                                
+                                // Only play sound for active emergencies
+                                if (emergency.status === 'active') {
+                                    playAlertSound();
+                                }
+                                
+                                // Set up location listener for this emergency if active
+                                if (emergency.status === 'active' || emergency.status === 'in-progress') {
+                                    setupLocationListener(emergency.id);
+                                }
+                            }
+                        } else if (change.type === 'modified') {
+                            // Emergency updated
+                            if (emergency.status === 'completed') {
+                                // Remove location listener if completed
+                                removeLocationListener(emergency.id);
+                                
+                                // Remove marker
+                                if (mapMarkers[emergency.id]) {
+                                    map.removeLayer(mapMarkers[emergency.id]);
+                                    delete mapMarkers[emergency.id];
+                                }
+                            }
+                        } else if (change.type === 'removed') {
+                            // Emergency deleted
+                            removeLocationListener(emergency.id);
+                            if (mapMarkers[emergency.id]) {
+                                map.removeLayer(mapMarkers[emergency.id]);
+                                delete mapMarkers[emergency.id];
+                            }
+                        }
+                    });
                     
-                    // Apply filter
-                    if (currentFilter === 'all' || data.status === currentFilter) {
-                        filteredEmergencies.push({...data, location});
-                    }
+                    // Refresh the display
+                    refreshEmergenciesList();
+                    loadStats();
                 });
+        }
+
+        // Setup real-time location listener for a specific emergency
+        function setupLocationListener(emergencyId) {
+            // Remove existing listener if any
+            removeLocationListener(emergencyId);
+            
+            // Create new listener for location history
+            const unsubscribe = db.collection(LOCATION_HISTORY_COLLECTION)
+                .where('emergencyId', '==', emergencyId)
+                .orderBy('sequence')
+                .onSnapshot((snapshot) => {
+                    snapshot.docChanges().forEach(change => {
+                        if (change.type === 'added' || change.type === 'modified') {
+                            const location = change.doc.data();
+                            
+                            // Update emergency document with latest location
+                            db.collection(EMERGENCIES_COLLECTION).doc(emergencyId).get().then(emergencyDoc => {
+                                if (emergencyDoc.exists) {
+                                    const emergency = emergencyDoc.data();
+                                    
+                                    // Update or add marker on map
+                                    updateEmergencyMarker(emergencyId, {
+                                        ...emergency,
+                                        currentLocation: location.location,
+                                        locationUpdateCount: location.sequence
+                                    });
+                                }
+                            });
+                            
+                            // Refresh the emergencies list to show updated location
+                            refreshEmergenciesList();
+                        }
+                    });
+                });
+            
+            // Store the unsubscribe function
+            activeLocationListeners.set(emergencyId, unsubscribe);
+        }
+
+        // Remove location listener
+        function removeLocationListener(emergencyId) {
+            if (activeLocationListeners.has(emergencyId)) {
+                const unsubscribe = activeLocationListeners.get(emergencyId);
+                unsubscribe();
+                activeLocationListeners.delete(emergencyId);
+            }
+        }
+
+        // Refresh emergencies list
+        async function refreshEmergenciesList() {
+            const snapshot = await db.collection(EMERGENCIES_COLLECTION)
+                .orderBy('timestamp', 'desc')
+                .get();
+            
+            const emergenciesList = document.getElementById('emergenciesList');
+            emergenciesList.innerHTML = '';
+            
+            let filteredEmergencies = [];
+            let emergencyCount = 0;
+            
+            // Get all emergencies first
+            const allEmergencies = [];
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                data.id = doc.id;
+                allEmergencies.push(data);
+            });
+            
+            // Apply filter
+            for (const emergency of allEmergencies) {
+                // Get latest location from location history
+                const locationSnapshot = await db.collection(LOCATION_HISTORY_COLLECTION)
+                    .where('emergencyId', '==', emergency.id)
+                    .orderBy('sequence', 'desc')
+                    .limit(1)
+                    .get();
                 
-                document.getElementById('emergencyCount').textContent = filteredEmergencies.length;
+                if (!locationSnapshot.empty) {
+                    const latestLocation = locationSnapshot.docs[0].data();
+                    emergency.currentLocation = latestLocation.location;
+                    emergency.locationUpdateCount = latestLocation.sequence;
+                }
                 
-                if (filteredEmergencies.length === 0) {
-                    emergenciesList.innerHTML = '<p style="text-align: center; padding: 20px;">No emergencies found</p>';
+                // Apply filter
+                if (currentFilter === 'all' || emergency.status === currentFilter) {
+                    filteredEmergencies.push(emergency);
+                    emergencyCount++;
                     
-                    // Clear map for completed emergencies when filter is not 'completed'
-                    if (currentFilter !== 'completed') {
-                        clearMarkersAndRoute();
-                        document.getElementById('selectedEmergencyInfo').innerHTML = '<h4>Select an emergency to view details</h4>';
-                    }
-                    return;
-                }
-                
-                // Clear markers only if we're not showing completed emergencies with history
-                if (currentFilter !== 'completed') {
-                    clearMarkersAndRoute();
-                }
-                
-                filteredEmergencies.forEach(emergency => {
                     const emergencyItem = createEmergencyItem(emergency);
                     emergenciesList.appendChild(emergencyItem);
                     
-                    // Add marker to map only for active and in-progress emergencies
-                    if (emergency.location && (emergency.status === 'active' || emergency.status === 'in-progress')) {
-                        const marker = L.marker([emergency.location.lat, emergency.location.lng]).addTo(map);
-                        
-                        // Customize marker based on status
-                        let markerColor = emergency.status === 'active' ? '#ff4d4d' : '#ffc107';
-                        let statusText = emergency.status === 'active' ? 'ACTIVE' : 'IN PROGRESS';
-                        
-                        // Get update number if available
-                        const updateInfo = emergency.location.updateNumber ? ` (Update #${emergency.location.updateNumber})` : '';
-                        
-                        marker.bindPopup(`
-                            <b>${emergency.userName}</b><br>
-                            <span style="color: ${markerColor}; font-weight: bold;">${statusText}${updateInfo}</span><br>
-                            Time: ${new Date(emergency.timestamp?.seconds * 1000).toLocaleString()}<br>
-                            Accuracy: ${emergency.location.accuracy ? Math.round(emergency.location.accuracy) + 'm' : 'N/A'}
-                        `);
-                        
-                        marker.on('click', () => selectEmergency(emergency));
-                        mapMarkers[emergency.id] = marker;
+                    // Update marker on map for active/in-progress
+                    if (emergency.currentLocation && (emergency.status === 'active' || emergency.status === 'in-progress')) {
+                        updateEmergencyMarker(emergency.id, emergency);
                     }
-                });
-                
-                // Check for new emergencies and play sound
-                snapshot.docChanges().forEach(change => {
-                    if (change.type === 'added') {
-                        const newEmergency = change.doc.data();
-                        // Only play sound for new active emergencies that haven't been processed
-                        if (newEmergency.status === 'active' && !processedEmergencies.has(change.doc.id)) {
-                            processedEmergencies.add(change.doc.id);
-                            playAlertSound();
-                            
-                            // Add new emergency class to the item for visual effect
-                            setTimeout(() => {
-                                const newItem = Array.from(document.querySelectorAll('.emergency-item')).find(
-                                    item => item.getAttribute('data-id') === change.doc.id
-                                );
-                                if (newItem) {
-                                    newItem.classList.add('new-emergency');
-                                    setTimeout(() => newItem.classList.remove('new-emergency'), 3000);
-                                }
-                            }, 100);
-                        }
-                    }
-                });
-                
-                loadStats();
-            });
+                }
+            }
+            
+            document.getElementById('emergencyCount').textContent = emergencyCount;
+            
+            if (filteredEmergencies.length === 0) {
+                emergenciesList.innerHTML = '<p style="text-align: center; padding: 20px;">No emergencies found</p>';
+                if (currentFilter !== 'completed') {
+                    clearMarkersAndRoute();
+                    document.getElementById('selectedEmergencyInfo').innerHTML = '<h4>Select an emergency to view details</h4>';
+                }
+            }
         }
 
-        // Create emergency item with location from either field
+        // Update emergency marker on map
+        function updateEmergencyMarker(emergencyId, emergency) {
+            if (!map || !emergency.currentLocation) return;
+            
+            // Remove existing marker
+            if (mapMarkers[emergencyId]) {
+                map.removeLayer(mapMarkers[emergencyId]);
+            }
+            
+            // Create new marker
+            const marker = L.marker([emergency.currentLocation.lat, emergency.currentLocation.lng]).addTo(map);
+            
+            // Customize marker based on status
+            let markerColor = emergency.status === 'active' ? '#ff4d4d' : '#ffc107';
+            let statusText = emergency.status === 'active' ? 'ACTIVE' : 'IN PROGRESS';
+            
+            marker.bindPopup(`
+                <b>${emergency.userName}</b><br>
+                <span style="color: ${markerColor}; font-weight: bold;">${statusText}</span><br>
+                <span style="color: #17a2b8;">Update #${emergency.locationUpdateCount || 0}</span><br>
+                Time: ${new Date().toLocaleString()}<br>
+                Accuracy: ${emergency.currentLocation.accuracy ? Math.round(emergency.currentLocation.accuracy) + 'm' : 'N/A'}
+            `);
+            
+            marker.on('click', () => selectEmergency(emergency));
+            mapMarkers[emergencyId] = marker;
+            
+            // If this is the selected emergency, center map on it
+            if (selectedEmergencyId === emergencyId) {
+                map.setView([emergency.currentLocation.lat, emergency.currentLocation.lng], 15);
+                showEmergencyInfo(emergency);
+            }
+        }
+
+        // Show emergency info
+        function showEmergencyInfo(emergency) {
+            const infoDiv = document.getElementById('selectedEmergencyInfo');
+            const time = emergency.timestamp ? new Date(emergency.timestamp.seconds * 1000).toLocaleString() : 'Just now';
+            const location = emergency.currentLocation || emergency.location || null;
+            
+            infoDiv.innerHTML = `
+                <h4>Selected Emergency</h4>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="info-label">Name</span>
+                        <span class="info-value">${emergency.userName}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Contact</span>
+                        <span class="info-value">${emergency.contactNumber}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Group</span>
+                        <span class="info-value">${emergency.groupName || 'N/A'}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Status</span>
+                        <span class="info-value">${emergency.status}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Time</span>
+                        <span class="info-value">${time}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Updates</span>
+                        <span class="info-value">#${emergency.locationUpdateCount || 0}</span>
+                    </div>
+                    ${location ? `
+                    <div class="info-item">
+                        <span class="info-label">Location</span>
+                        <span class="info-value">${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Accuracy</span>
+                        <span class="info-value">${location.accuracy ? Math.round(location.accuracy) + 'm' : 'N/A'}</span>
+                    </div>
+                    ` : ''}
+                </div>
+                ${emergency.handledBy ? `
+                    <div style="margin-top: 10px; padding: 10px; background: #e3f2fd; border-radius: 5px;">
+                        <strong>Handled by:</strong> ${emergency.handledByName} (${emergency.handledByRole})
+                    </div>
+                ` : ''}
+            `;
+        }
+
+        // Create emergency item
         function createEmergencyItem(emergency) {
             const div = document.createElement('div');
             div.className = `emergency-item ${emergency.status} ${emergency.id === selectedEmergencyId ? 'active' : ''}`;
             div.setAttribute('data-id', emergency.id);
-            div.ondblclick = () => selectEmergency(emergency);
+            div.onclick = () => selectEmergency(emergency);
             
             const time = emergency.timestamp ? new Date(emergency.timestamp.seconds * 1000).toLocaleString() : 'Just now';
             
-            // Get location from either field
-            const location = emergency.location || emergency.currentLocation || null;
+            // Get location
+            const location = emergency.currentLocation || emergency.location || null;
             const locationText = location ? 
-                `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` + (location.updateNumber ? ` (#${location.updateNumber})` : '') : 
+                `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` + (emergency.locationUpdateCount ? ` (#${emergency.locationUpdateCount})` : '') : 
                 'No location';
             
             let statusBadge = '';
@@ -1980,7 +2123,7 @@
                     // Clear existing markers and route
                     clearMarkersAndRoute();
                     
-                    // Get location history
+                    // Get all location history
                     const historySnapshot = await db.collection(LOCATION_HISTORY_COLLECTION)
                         .where('emergencyId', '==', emergencyId)
                         .orderBy('sequence')
@@ -1991,9 +2134,10 @@
                         locations.push(doc.data());
                     });
                     
-                    // Show the emergency location with history
+                    // Show all locations on map
                     if (locations.length > 0) {
-                        // Add markers for all locations
+                        const waypoints = [];
+                        
                         locations.forEach((loc, index) => {
                             const marker = L.marker([loc.location.lat, loc.location.lng]).addTo(map);
                             marker.bindPopup(`
@@ -2003,20 +2147,14 @@
                                 Accuracy: ${loc.location.accuracy ? Math.round(loc.location.accuracy) + 'm' : 'N/A'}
                             `);
                             
-                            // Color markers based on sequence
-                            const hue = (index / locations.length) * 120; // Green spectrum
-                            marker._icon.style.filter = `hue-rotate(${hue}deg)`;
+                            waypoints.push(L.latLng(loc.location.lat, loc.location.lng));
                         });
                         
                         // Center map on first location
                         map.setView([locations[0].location.lat, locations[0].location.lng], 14);
                         
-                        // Draw route if there are multiple points
+                        // Draw route if multiple points
                         if (locations.length > 1) {
-                            const waypoints = locations.map(loc => 
-                                L.latLng(loc.location.lat, loc.location.lng)
-                            );
-                            
                             routingControl = L.Routing.control({
                                 waypoints: waypoints,
                                 routeWhileDragging: false,
@@ -2027,18 +2165,16 @@
                             }).addTo(map);
                         }
                         
-                        showEmergencyHistory(emergency, locations);
+                        showHistoryInfo(emergency, locations);
                     } else if (emergency.location) {
                         // Fallback to single location
                         const marker = L.marker([emergency.location.lat, emergency.location.lng]).addTo(map);
                         marker.bindPopup(`
                             <b>${emergency.userName}</b><br>
-                            <span style="color: #28a745; font-weight: bold;">COMPLETED</span><br>
-                            Completed: ${emergency.completedAt ? new Date(emergency.completedAt.seconds * 1000).toLocaleString() : 'N/A'}
+                            <span style="color: #28a745; font-weight: bold;">COMPLETED</span>
                         `);
-                        mapMarkers[emergency.id] = marker;
                         map.setView([emergency.location.lat, emergency.location.lng], 14);
-                        showEmergencyHistory(emergency, []);
+                        showHistoryInfo(emergency, []);
                     }
                 }
             } catch (error) {
@@ -2046,26 +2182,26 @@
             }
         };
 
-        // Show emergency history
-        function showEmergencyHistory(emergency, locations) {
+        // Show history info
+        function showHistoryInfo(emergency, locations) {
             const infoDiv = document.getElementById('selectedEmergencyInfo');
             
             const receivedTime = emergency.timestamp ? new Date(emergency.timestamp.seconds * 1000) : null;
             const handledTime = emergency.handledAt ? new Date(emergency.handledAt.seconds * 1000) : null;
             const completedTime = emergency.completedAt ? new Date(emergency.completedAt.seconds * 1000) : null;
             
-            // Calculate response time and total time
-            let responseTime = '';
-            let totalTime = '';
+            // Calculate times
+            let responseTime = 'N/A';
+            let totalTime = 'N/A';
             
             if (receivedTime && handledTime) {
                 const responseMinutes = Math.round((handledTime - receivedTime) / 60000);
-                responseTime = `${responseMinutes} minutes`;
+                responseTime = `${responseMinutes} min`;
             }
             
             if (receivedTime && completedTime) {
                 const totalMinutes = Math.round((completedTime - receivedTime) / 60000);
-                totalTime = `${totalMinutes} minutes`;
+                totalTime = `${totalMinutes} min`;
             }
             
             // Create location history timeline
@@ -2120,24 +2256,6 @@
                         <div class="stat-label-small">Total Duration</div>
                     </div>
                 </div>
-                <div class="info-grid" style="margin-top: 10px;">
-                    <div class="info-item">
-                        <span class="info-label">Name</span>
-                        <span class="info-value">${emergency.userName}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Contact</span>
-                        <span class="info-value">${emergency.contactNumber}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Group</span>
-                        <span class="info-value">${emergency.groupName || 'N/A'}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Total Updates</span>
-                        <span class="info-value">${emergency.locationUpdateCount || locations.length || 0}</span>
-                    </div>
-                </div>
             `;
         }
 
@@ -2151,69 +2269,18 @@
             document.querySelectorAll('.emergency-item').forEach(item => {
                 item.classList.remove('active');
             });
-            event?.target.closest('.emergency-item')?.classList.add('active');
+            const selectedItem = document.querySelector(`.emergency-item[data-id="${emergency.id}"]`);
+            if (selectedItem) {
+                selectedItem.classList.add('active');
+            }
             
-            // Get location from either field
-            const location = emergency.location || emergency.currentLocation || null;
+            // Show info
+            showEmergencyInfo(emergency);
             
-            // Center map and show info for active/in-progress emergencies
+            // Center map on location if available
+            const location = emergency.currentLocation || emergency.location;
             if (location && map) {
-                // Clear any existing route
-                clearRoute();
-                
-                // Center map on location
                 map.setView([location.lat, location.lng], 15);
-                
-                // Show info
-                const infoDiv = document.getElementById('selectedEmergencyInfo');
-                const time = emergency.timestamp ? new Date(emergency.timestamp.seconds * 1000).toLocaleString() : 'Just now';
-                
-                infoDiv.innerHTML = `
-                    <h4>Selected Emergency</h4>
-                    <div class="info-grid">
-                        <div class="info-item">
-                            <span class="info-label">Name</span>
-                            <span class="info-value">${emergency.userName}</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Contact</span>
-                            <span class="info-value">${emergency.contactNumber}</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Group</span>
-                            <span class="info-value">${emergency.groupName || 'N/A'}</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Status</span>
-                            <span class="info-value">${emergency.status}</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Time</span>
-                            <span class="info-value">${time}</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Location</span>
-                            <span class="info-value">${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}</span>
-                        </div>
-                        ${location.updateNumber ? `
-                        <div class="info-item">
-                            <span class="info-label">Update #</span>
-                            <span class="info-value">${location.updateNumber}</span>
-                        </div>
-                        ` : ''}
-                        ${location.accuracy ? `
-                        <div class="info-item">
-                            <span class="info-label">Accuracy</span>
-                            <span class="info-value">${Math.round(location.accuracy)}m</span>
-                        </div>
-                        ` : ''}
-                    </div>
-                    ${emergency.handledBy ? `
-                        <div style="margin-top: 10px; padding: 10px; background: #e3f2fd; border-radius: 5px;">
-                            <strong>Handled by:</strong> ${emergency.handledByName} (${emergency.handledByRole})
-                        </div>
-                    ` : ''}
-                `;
             }
         };
 
@@ -2250,14 +2317,14 @@
                     completedBy: currentUser.uid
                 });
                 
-                // Clear the marker for this emergency
+                // Remove location listener
+                removeLocationListener(emergencyId);
+                
+                // Clear the marker
                 if (mapMarkers[emergencyId]) {
                     map.removeLayer(mapMarkers[emergencyId]);
                     delete mapMarkers[emergencyId];
                 }
-                
-                // Clear route
-                clearRoute();
                 
                 // Clear selected info if this was the selected emergency
                 if (selectedEmergencyId === emergencyId) {
@@ -2275,9 +2342,25 @@
             
             if (confirm('Are you sure you want to delete this emergency?')) {
                 try {
-                    await db.collection(EMERGENCIES_COLLECTION).doc(emergencyId).delete();
+                    // Delete all location history first
+                    const historySnapshot = await db.collection(LOCATION_HISTORY_COLLECTION)
+                        .where('emergencyId', '==', emergencyId)
+                        .get();
                     
-                    // Remove marker if exists
+                    const batch = db.batch();
+                    historySnapshot.forEach(doc => {
+                        batch.delete(doc.ref);
+                    });
+                    
+                    // Delete emergency
+                    batch.delete(db.collection(EMERGENCIES_COLLECTION).doc(emergencyId));
+                    
+                    await batch.commit();
+                    
+                    // Remove location listener
+                    removeLocationListener(emergencyId);
+                    
+                    // Remove marker
                     if (mapMarkers[emergencyId]) {
                         map.removeLayer(mapMarkers[emergencyId]);
                         delete mapMarkers[emergencyId];
@@ -2990,7 +3073,7 @@
                 createBtn.textContent = 'Creating...';
                 createBtn.disabled = true;
                 
-                // Create the new admin using Firebase Admin SDK approach
+                // Create the new admin
                 const userCredential = await auth.createUserWithEmailAndPassword(email, password);
                 const newUser = userCredential.user;
                 
@@ -3089,7 +3172,7 @@
                 // Get location
                 const location = data.currentLocation || data.location || null;
                 const locationText = location ? 
-                    `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` + (location.updateNumber ? ` (#${location.updateNumber})` : '') : 
+                    `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` + (data.locationUpdateCount ? ` (#${data.locationUpdateCount})` : '') : 
                     'No location';
                 
                 // Get update count from location history
@@ -3166,24 +3249,6 @@
             } catch (error) {
                 console.error('Error loading stats:', error);
             }
-        }
-
-        // Setup realtime listener
-        function setupRealtimeListener() {
-            db.collection(EMERGENCIES_COLLECTION)
-                .where('status', '==', 'active')
-                .onSnapshot((snapshot) => {
-                    snapshot.docChanges().forEach((change) => {
-                        if (change.type === 'added') {
-                            // Play sound for new active emergencies
-                            if (!processedEmergencies.has(change.doc.id)) {
-                                processedEmergencies.add(change.doc.id);
-                                playAlertSound();
-                            }
-                            loadStats();
-                        }
-                    });
-                });
         }
 
         // Close modal
