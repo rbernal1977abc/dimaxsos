@@ -410,6 +410,18 @@
             font-size: 10px;
             color: #ff4d4d;
             font-weight: 600;
+            text-align: center;
+            margin: 2px 0;
+        }
+
+        .coordinates {
+            font-size: 10px;
+            color: #666;
+            background: #f0f0f0;
+            padding: 4px;
+            border-radius: 4px;
+            margin-top: 2px;
+            word-break: break-all;
         }
 
         /* Announcement Section */
@@ -544,6 +556,7 @@
                     <span id="lastUpdateTime">⏱️ Last: --:--</span>
                 </div>
                 <div id="nextUpdateTimer" class="next-update hidden"></div>
+                <div id="coordinates" class="coordinates hidden"></div>
                 <div id="locationNote" class="location-note">📍 Ibahagi ang location</div>
                 
                 <!-- Announcement Section -->
@@ -708,6 +721,7 @@
             document.getElementById('lastUpdateTime').textContent = '⏱️ Last: --:--';
             document.getElementById('sosTimer').textContent = '00:00:00';
             document.getElementById('nextUpdateTimer').classList.add('hidden');
+            document.getElementById('coordinates').classList.add('hidden');
         }
 
         function showLandingPage() {
@@ -816,11 +830,15 @@
                     return;
                 }
                 
+                console.log('Requesting location...');
+                
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
+                        console.log('Location received:', position.coords);
                         resolve(position);
                     },
                     (error) => {
+                        console.error('Location error:', error);
                         reject(error);
                     },
                     {
@@ -834,7 +852,12 @@
 
         // Update location with counter
         async function updateLocation(emergencyId) {
-            if (!emergencyId || !isSOSActive) return false;
+            if (!emergencyId || !isSOSActive) {
+                console.log('Not updating: SOS not active or no emergency ID');
+                return false;
+            }
+            
+            console.log(`Attempting location update #${locationUpdateCount + 1}`);
             
             try {
                 const position = await getCurrentLocation();
@@ -842,7 +865,6 @@
                 // Increment counter
                 locationUpdateCount++;
                 const now = new Date();
-                const timestamp = firebase.firestore.FieldValue.serverTimestamp();
                 
                 // Save location data
                 const locationData = {
@@ -850,8 +872,11 @@
                     lng: position.coords.longitude,
                     accuracy: position.coords.accuracy,
                     speed: position.coords.speed,
-                    heading: position.coords.heading
+                    heading: position.coords.heading,
+                    altitude: position.coords.altitude
                 };
+                
+                console.log(`Saving location #${locationUpdateCount} to Firebase:`, locationData);
                 
                 // Update main emergency document
                 await db.collection(EMERGENCIES_COLLECTION).doc(emergencyId).update({
@@ -860,7 +885,7 @@
                         updateNumber: locationUpdateCount,
                         timestamp: now.toISOString()
                     },
-                    lastUpdate: timestamp,
+                    lastUpdate: firebase.firestore.FieldValue.serverTimestamp(),
                     locationUpdateCount: locationUpdateCount
                 });
 
@@ -870,9 +895,11 @@
                     userId: auth.currentUser.uid,
                     sequence: locationUpdateCount,
                     location: locationData,
-                    timestamp: timestamp,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                     clientTimestamp: now.toISOString()
                 });
+
+                console.log(`Location #${locationUpdateCount} saved successfully`);
 
                 // Update UI
                 lastLocationUpdate = now;
@@ -885,7 +912,11 @@
                 document.getElementById('locationNote').innerHTML = 
                     `📍 Location #${locationUpdateCount} shared`;
                 
-                console.log(`Location #${locationUpdateCount} updated successfully`);
+                // Show coordinates
+                const coordsEl = document.getElementById('coordinates');
+                coordsEl.classList.remove('hidden');
+                coordsEl.innerHTML = `📍 ${locationData.lat.toFixed(6)}, ${locationData.lng.toFixed(6)} (accuracy: ${Math.round(locationData.accuracy)}m)`;
+                
                 return true;
                 
             } catch (error) {
@@ -904,7 +935,12 @@
 
         // Start 1-minute updates
         function startOneMinuteUpdates(emergencyId) {
-            if (!emergencyId) return;
+            if (!emergencyId) {
+                console.log('No emergency ID for updates');
+                return;
+            }
+            
+            console.log('Starting 1-minute location updates for emergency:', emergencyId);
             
             // Clear any existing intervals
             if (updateInterval) {
@@ -920,42 +956,37 @@
             // Function to update the countdown
             function updateCountdown() {
                 const now = new Date();
-                const nextUpdate = new Date(Math.ceil(now.getTime() / 60000) * 60000);
-                const secondsLeft = Math.ceil((nextUpdate - now) / 1000);
+                const seconds = now.getSeconds();
+                const secondsLeft = 60 - seconds;
                 
-                if (secondsLeft > 0) {
-                    document.getElementById('nextUpdateTimer').textContent = 
-                        `⏱️ Next update in ${secondsLeft} seconds`;
-                }
+                document.getElementById('nextUpdateTimer').textContent = 
+                    `⏱️ Next update in ${secondsLeft} seconds`;
             }
             
             // Update countdown every second
             nextUpdateTimer = setInterval(updateCountdown, 1000);
             
-            // Calculate milliseconds until next minute
-            const now = new Date();
-            const msUntilNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
-            
-            // Schedule first update at the next minute mark
+            // Do an immediate first update
             setTimeout(() => {
                 if (isSOSActive && emergencyId) {
+                    console.log('Performing initial location update');
                     updateLocation(emergencyId);
-                    
-                    // Then set up interval for every minute after that
-                    updateInterval = setInterval(() => {
-                        if (isSOSActive && emergencyId) {
-                            updateLocation(emergencyId);
-                        }
-                    }, 60000);
                 }
-            }, msUntilNextMinute);
+            }, 2000);
             
-            // Also do an immediate first update
-            setTimeout(() => {
+            // Then set up interval for every minute
+            updateInterval = setInterval(() => {
                 if (isSOSActive && emergencyId) {
+                    console.log('Minute interval triggered - updating location');
                     updateLocation(emergencyId);
+                } else {
+                    console.log('SOS not active, clearing interval');
+                    if (updateInterval) {
+                        clearInterval(updateInterval);
+                        updateInterval = null;
+                    }
                 }
-            }, 1000);
+            }, 60000); // 60,000 ms = 1 minute
         }
 
         function stopTracking() {
@@ -982,6 +1013,8 @@
             try {
                 if (isSOSActive) {
                     // STOP Pressed
+                    console.log('Stopping SOS');
+                    
                     stopTracking();
                     
                     // Clear intervals
@@ -1006,6 +1039,7 @@
                                 updateNumber: locationUpdateCount
                             } : null
                         });
+                        console.log('Emergency marked as completed');
                     }
                     
                     resetSOSButton();
@@ -1014,6 +1048,8 @@
                     
                 } else {
                     // SOS Pressed
+                    console.log('Starting SOS');
+                    
                     statusDiv.innerHTML = '📍 Requesting location permission...';
                     statusDiv.className = 'status-message info';
                     locationNote.innerHTML = '📍 Please allow location access';
@@ -1029,6 +1065,7 @@
                             .get();
                         
                         if (!activeEmergencies.empty) {
+                            console.log('Found existing active emergency');
                             // Use existing emergency
                             currentEmergencyId = activeEmergencies.docs[0].id;
                             isSOSActive = true;
@@ -1044,7 +1081,7 @@
                             return;
                         }
 
-                        // Test location permission first
+                        // Test location permission
                         try {
                             await getCurrentLocation();
                         } catch (locationError) {
@@ -1072,8 +1109,10 @@
                             locationUpdateCount: 0
                         };
 
+                        console.log('Creating new emergency document');
                         const docRef = await db.collection(EMERGENCIES_COLLECTION).add(emergencyData);
                         currentEmergencyId = docRef.id;
+                        console.log('Emergency created with ID:', currentEmergencyId);
 
                         // Update UI
                         isSOSActive = true;
