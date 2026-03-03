@@ -9,6 +9,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
     <style>
+        /* Keep all your existing styles exactly the same */
         * {
             margin: 0;
             padding: 0;
@@ -440,9 +441,47 @@
         .hidden {
             display: none !important;
         }
+
+        /* Loading overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(26, 26, 46, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 0.3s ease;
+        }
+
+        .loading-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #ffb3b3;
+            border-top-color: #ff4d4d;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
+    <!-- Loading overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+    </div>
+
     <div class="full-screen">
         <!-- Landing Page - Scrollable -->
         <div id="landingPage" class="container">
@@ -555,6 +594,7 @@
     </div>
 
     <script>
+        // Firebase Configuration
         const firebaseConfig = {
             apiKey: "AIzaSyBXE3cnFZwFH7EhxwdIWjHh18s-xfWpCFs",
             authDomain: "dimax-sos.firebaseapp.com",
@@ -564,16 +604,19 @@
             appId: "1:1003766190116:web:921944e615fa39260a08b1"
         };
 
+        // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
 
+        // Collections
         const USERS_COLLECTION = 'registered_users';
         const EMERGENCIES_COLLECTION = 'emergencies';
         const LOCATION_HISTORY_COLLECTION = 'location_history';
         const CODES_COLLECTION = 'registration_codes';
         const GROUPS_COLLECTION = 'groups';
 
+        // Global variables
         let isSOSActive = false;
         let isProcessing = false;
         let watchId = null;
@@ -586,52 +629,203 @@
         let updateInterval = null;
         let nextUpdateTimer = null;
         let lastLocationPosition = null;
+        let authInitialized = false;
 
+        // Elements
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const sosButton = document.getElementById('sosButton');
+        const statusDiv = document.getElementById('sosStatus');
+        const locationNote = document.getElementById('locationNote');
+
+        // ===== FAST AUTO-LOGIN ON PAGE LOAD =====
+        // Hide loading overlay immediately when auth is ready
         auth.onAuthStateChanged(async (user) => {
+            console.log('Auth state changed:', user ? 'Logged in' : 'Logged out');
+            
             if (user) {
-                const activeEmergencies = await db.collection(EMERGENCIES_COLLECTION)
-                    .where('userId', '==', user.uid)
-                    .where('status', '==', 'active')
-                    .get();
-                
-                if (!activeEmergencies.empty) {
-                    const emergencyDoc = activeEmergencies.docs[0];
-                    currentEmergencyId = emergencyDoc.id;
-                    isSOSActive = true;
+                // User is logged in - immediately show SOS page
+                try {
+                    // Check for active emergency in parallel
+                    const [activeEmergencies, userDoc] = await Promise.all([
+                        db.collection(EMERGENCIES_COLLECTION)
+                            .where('userId', '==', user.uid)
+                            .where('status', '==', 'active')
+                            .get(),
+                        db.collection(USERS_COLLECTION).doc(user.uid).get()
+                    ]);
                     
-                    const historyCount = await db.collection(LOCATION_HISTORY_COLLECTION)
-                        .where('emergencyId', '==', currentEmergencyId)
-                        .get();
-                    locationUpdateCount = historyCount.size;
-                    
-                    const emergencyData = emergencyDoc.data();
-                    if (emergencyData.timestamp) {
-                        sosStartTime = emergencyData.timestamp.toDate();
+                    if (!activeEmergencies.empty) {
+                        const emergencyDoc = activeEmergencies.docs[0];
+                        currentEmergencyId = emergencyDoc.id;
+                        isSOSActive = true;
+                        
+                        // Get location history count
+                        const historyCount = await db.collection(LOCATION_HISTORY_COLLECTION)
+                            .where('emergencyId', '==', currentEmergencyId)
+                            .get();
+                        locationUpdateCount = historyCount.size;
+                        
+                        const emergencyData = emergencyDoc.data();
+                        if (emergencyData.timestamp) {
+                            sosStartTime = emergencyData.timestamp.toDate();
+                        }
+                        
+                        if (emergencyData.currentLocation) {
+                            lastLocationPosition = emergencyData.currentLocation;
+                        }
                     }
                     
-                    if (emergencyData.currentLocation) {
-                        lastLocationPosition = emergencyData.currentLocation;
+                    if (userDoc.exists) {
+                        currentUser = userDoc.data();
                     }
-                }
-                
-                const userDoc = await db.collection(USERS_COLLECTION).doc(user.uid).get();
-                if (userDoc.exists) {
-                    currentUser = userDoc.data();
+                    
+                    // Show SOS page immediately
+                    showSOSPage();
+                    
+                } catch (error) {
+                    console.error('Error loading user data:', error);
+                    // Still try to show SOS page
                     showSOSPage();
                 }
             } else {
+                // No user - show landing page
                 showLandingPage();
+            }
+            
+            // Hide loading overlay
+            setTimeout(() => {
+                loadingOverlay.classList.add('hidden');
+            }, 300);
+            
+            authInitialized = true;
+        });
+
+        // ===== FAST REGISTRATION WITH IMMEDIATE LOGIN =====
+        document.getElementById('registerFormElement').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const registerMsg = document.getElementById('registerMessage');
+            registerMsg.innerHTML = '⏳ Registering...';
+            registerMsg.className = 'message info';
+            
+            const firstName = document.getElementById('firstName').value;
+            const lastName = document.getElementById('lastName').value;
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPassword').value;
+            const contactNumber = document.getElementById('contactNumber').value;
+            const regCode = document.getElementById('regCode').value;
+            
+            try {
+                // Find the code
+                const codeSnapshot = await db.collection(CODES_COLLECTION)
+                    .where('code', '==', regCode)
+                    .get();
+
+                if (codeSnapshot.empty) {
+                    registerMsg.innerHTML = '❌ Invalid registration code';
+                    registerMsg.className = 'message error';
+                    return;
+                }
+
+                const codeDoc = codeSnapshot.docs[0];
+                const codeData = codeDoc.data();
+                
+                // Get group information
+                const groupDoc = await db.collection(GROUPS_COLLECTION).doc(codeData.groupId).get();
+                
+                if (!groupDoc.exists) {
+                    registerMsg.innerHTML = '❌ Group not found';
+                    registerMsg.className = 'message error';
+                    return;
+                }
+                
+                // Create user in Firebase Auth
+                const userCred = await auth.createUserWithEmailAndPassword(email, password);
+                
+                // Save user data in Firestore (don't wait for this to complete before showing success)
+                const userSavePromise = db.collection(USERS_COLLECTION).doc(userCred.user.uid).set({
+                    userId: userCred.user.uid,
+                    firstName: firstName,
+                    lastName: lastName,
+                    email: email,
+                    contactNumber: contactNumber,
+                    groupId: codeData.groupId,
+                    groupName: groupDoc.data().name,
+                    registeredAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    status: 'active',
+                    registeredWithCode: regCode
+                });
+
+                // Update usage count (optional)
+                const usageUpdatePromise = codeDoc.ref.update({
+                    lastUsedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    usageCount: firebase.firestore.FieldValue.increment(1)
+                }).catch(() => {}); // Ignore errors
+
+                // Show success message immediately
+                registerMsg.innerHTML = '✅ Registration successful! Logging in...';
+                registerMsg.className = 'message success';
+                
+                // Wait for both promises to complete in background
+                Promise.all([userSavePromise, usageUpdatePromise])
+                    .then(() => {
+                        console.log('User data saved successfully');
+                    })
+                    .catch((error) => {
+                        console.error('Background save error:', error);
+                    });
+                
+                // The auth state change will automatically redirect to SOS page
+                // No need to manually redirect
+                
+            } catch (error) {
+                console.error('Registration error:', error);
+                
+                if (error.code === 'auth/email-already-in-use') {
+                    registerMsg.innerHTML = '❌ Email already registered';
+                } else if (error.code === 'auth/weak-password') {
+                    registerMsg.innerHTML = '❌ Password too weak (min 6 characters)';
+                } else {
+                    registerMsg.innerHTML = '❌ ' + error.message;
+                }
+                registerMsg.className = 'message error';
+            }
+        });
+
+        // ===== FAST LOGIN =====
+        document.getElementById('loginFormElement').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const loginMsg = document.getElementById('loginMessage');
+            loginMsg.innerHTML = '⏳ Logging in...';
+            loginMsg.className = 'message info';
+            
+            try {
+                await auth.signInWithEmailAndPassword(
+                    document.getElementById('loginEmail').value,
+                    document.getElementById('loginPassword').value
+                );
+                // Auth state change will handle redirect
+            } catch (error) {
+                loginMsg.innerHTML = '❌ ' + error.message;
+                loginMsg.className = 'message error';
             }
         });
 
         function showSOSPage() {
+            // Hide landing page, show SOS page immediately
             document.getElementById('landingPage').style.display = 'none';
             document.getElementById('sosPage').classList.add('active');
-            document.getElementById('displayName').textContent = `${currentUser.firstName} ${currentUser.lastName}`;
-            if (currentUser.groupName) {
-                document.getElementById('groupBadge').textContent = `👥 ${currentUser.groupName}`;
+            
+            // Update user info
+            if (currentUser) {
+                document.getElementById('displayName').textContent = `${currentUser.firstName} ${currentUser.lastName}`;
+                if (currentUser.groupName) {
+                    document.getElementById('groupBadge').textContent = `👥 ${currentUser.groupName}`;
+                }
             }
             
+            // Restore SOS state if active
             if (isSOSActive) {
                 sosButton.classList.add('active');
                 document.querySelector('.sos-instruction').innerHTML = '<span class="sos-engaged">ENGAGED</span><br><span class="sos-press-to-stop">PRESS TO STOP</span>';
@@ -651,10 +845,18 @@
                     startTimer();
                 }
                 
-                startOneMinuteUpdates(currentEmergencyId);
+                if (currentEmergencyId) {
+                    startOneMinuteUpdates(currentEmergencyId);
+                }
             } else {
                 resetSOSButton();
             }
+        }
+
+        function showLandingPage() {
+            document.getElementById('landingPage').style.display = 'block';
+            document.getElementById('sosPage').classList.remove('active');
+            resetSOSButton();
         }
 
         function resetSOSButton() {
@@ -695,11 +897,6 @@
             document.getElementById('nextUpdateTimer').classList.add('hidden');
         }
 
-        function showLandingPage() {
-            document.getElementById('landingPage').style.display = 'block';
-            document.getElementById('sosPage').classList.remove('active');
-        }
-
         window.switchTab = function(tab) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.form-container').forEach(f => f.classList.remove('active'));
@@ -712,129 +909,7 @@
             }
         };
 
-        // Login
-        document.getElementById('loginFormElement').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            try {
-                await auth.signInWithEmailAndPassword(
-                    document.getElementById('loginEmail').value,
-                    document.getElementById('loginPassword').value
-                );
-            } catch (error) {
-                document.getElementById('loginMessage').innerHTML = '❌ ' + error.message;
-            }
-        });
-
-        // ===== COMPLETELY FIXED REGISTRATION =====
-        document.getElementById('registerFormElement').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const registerMsg = document.getElementById('registerMessage');
-            registerMsg.innerHTML = '⏳ Processing...';
-            registerMsg.className = 'message info';
-            
-            const firstName = document.getElementById('firstName').value;
-            const lastName = document.getElementById('lastName').value;
-            const email = document.getElementById('regEmail').value;
-            const password = document.getElementById('regPassword').value;
-            const contactNumber = document.getElementById('contactNumber').value;
-            const regCode = document.getElementById('regCode').value;
-            
-            try {
-                console.log('Looking for code:', regCode);
-                
-                // Get ALL codes from Firestore to debug
-                const allCodesSnapshot = await db.collection(CODES_COLLECTION).get();
-                console.log('Total codes in database:', allCodesSnapshot.size);
-                allCodesSnapshot.forEach(doc => {
-                    console.log('Code in DB:', doc.data().code);
-                });
-                
-                // Try to find the code (case insensitive)
-                const codeSnapshot = await db.collection(CODES_COLLECTION)
-                    .where('code', '==', regCode)
-                    .get();
-
-                console.log('Code search result:', codeSnapshot.empty ? 'NOT FOUND' : 'FOUND');
-
-                if (codeSnapshot.empty) {
-                    registerMsg.innerHTML = '❌ Invalid registration code. Please check and try again.';
-                    registerMsg.className = 'message error';
-                    return;
-                }
-
-                const codeDoc = codeSnapshot.docs[0];
-                const codeData = codeDoc.data();
-                
-                console.log('Code data:', codeData);
-                
-                // Check if code has groupId
-                if (!codeData.groupId) {
-                    registerMsg.innerHTML = '❌ Code has no associated group.';
-                    registerMsg.className = 'message error';
-                    return;
-                }
-                
-                // Get group information
-                const groupDoc = await db.collection(GROUPS_COLLECTION).doc(codeData.groupId).get();
-                
-                if (!groupDoc.exists) {
-                    registerMsg.innerHTML = '❌ Group not found for this code.';
-                    registerMsg.className = 'message error';
-                    return;
-                }
-                
-                console.log('Group found:', groupDoc.data().name);
-                
-                // Create user in Firebase Auth
-                const userCred = await auth.createUserWithEmailAndPassword(email, password);
-                console.log('User created in Auth:', userCred.user.uid);
-                
-                // Save user data in Firestore
-                await db.collection(USERS_COLLECTION).doc(userCred.user.uid).set({
-                    userId: userCred.user.uid,
-                    firstName: firstName,
-                    lastName: lastName,
-                    email: email,
-                    contactNumber: contactNumber,
-                    groupId: codeData.groupId,
-                    groupName: groupDoc.data().name,
-                    registeredAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    status: 'active',
-                    registeredWithCode: regCode
-                });
-
-                console.log('User saved to Firestore');
-
-                // Try to update usage count (optional, won't fail if it doesn't work)
-                try {
-                    await codeDoc.ref.update({
-                        lastUsedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                        usageCount: firebase.firestore.FieldValue.increment(1)
-                    });
-                } catch (updateError) {
-                    console.log('Usage tracking optional, ignoring error:', updateError);
-                }
-
-                registerMsg.innerHTML = '✅ Registration successful! Logging in...';
-                registerMsg.className = 'message success';
-                
-            } catch (error) {
-                console.error('Registration error details:', error);
-                
-                if (error.code === 'auth/email-already-in-use') {
-                    registerMsg.innerHTML = '❌ Email already registered';
-                } else if (error.code === 'auth/weak-password') {
-                    registerMsg.innerHTML = '❌ Password too weak (min 6 characters)';
-                } else if (error.code === 'auth/invalid-email') {
-                    registerMsg.innerHTML = '❌ Invalid email format';
-                } else {
-                    registerMsg.innerHTML = '❌ Registration failed: ' + error.message;
-                }
-                registerMsg.className = 'message error';
-            }
-        });
-
+        // Location functions
         function requestLocation() {
             return new Promise((resolve, reject) => {
                 if (!navigator.geolocation) {
@@ -978,19 +1053,15 @@
             }
         }
 
-        const sosButton = document.getElementById('sosButton');
-        const statusDiv = document.getElementById('sosStatus');
-        const locationNote = document.getElementById('locationNote');
-
+        // SOS Button click handler
         sosButton.addEventListener('click', async () => {
-            if (isProcessing) {
-                return;
-            }
+            if (isProcessing) return;
             
             isProcessing = true;
             
             try {
                 if (isSOSActive) {
+                    // STOP Pressed
                     stopTracking();
                     
                     if (updateInterval) {
@@ -1020,6 +1091,7 @@
                     statusDiv.className = 'status-message info';
                     
                 } else {
+                    // SOS Pressed
                     statusDiv.innerHTML = '📍 Asking for location...';
                     statusDiv.className = 'status-message info';
                     locationNote.innerHTML = '📍 Please allow location';
@@ -1096,6 +1168,7 @@
                         
                     } catch (error) {
                         if (error.code === 1) {
+                            // User denied location
                             try {
                                 const user = auth.currentUser;
                                 if (!user) throw new Error('Not logged in');
@@ -1148,6 +1221,7 @@
             }
         });
 
+        // Handle page visibility changes
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible' && isSOSActive && currentEmergencyId) {
                 db.collection(LOCATION_HISTORY_COLLECTION)
@@ -1161,9 +1235,15 @@
             }
         });
 
+        // Request notification permission
         if ('Notification' in window) {
             Notification.requestPermission();
         }
+
+        // Force hide loading overlay after 3 seconds max (fallback)
+        setTimeout(() => {
+            loadingOverlay.classList.add('hidden');
+        }, 3000);
     </script>
 </body>
 </html>
