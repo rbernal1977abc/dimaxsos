@@ -214,6 +214,18 @@
             border-radius: 5px;
             cursor: pointer;
             background: #f0f0f0;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .sound-toggle button.sound-on {
+            background: #28a745;
+            color: white;
+        }
+
+        .sound-toggle button.sound-off {
+            background: #dc3545;
+            color: white;
         }
 
         .emergencies-grid {
@@ -249,6 +261,11 @@
             transition: all 0.3s ease;
             position: relative;
             animation: slideIn 0.3s ease;
+        }
+
+        .emergency-item.new-emergency {
+            animation: pulse 1s ease-in-out 3;
+            background: #fff3f3;
         }
 
         .emergency-item:hover {
@@ -1111,31 +1128,6 @@
             color: #666;
         }
 
-        @media (max-width: 768px) {
-            .emergencies-grid,
-            .users-groups-container {
-                grid-template-columns: 1fr;
-            }
-            
-            .filter-bar {
-                flex-direction: column;
-            }
-            
-            .sound-toggle {
-                margin-left: 0;
-            }
-            
-            .header-right {
-                flex-direction: column;
-                width: 100%;
-            }
-            
-            .codes-grid,
-            .admins-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
         @keyframes slideIn {
             from {
                 opacity: 0;
@@ -1148,19 +1140,9 @@
         }
 
         @keyframes pulse {
-            0% {
-                box-shadow: 0 0 0 0 rgba(255,68,68,0.7);
-            }
-            70% {
-                box-shadow: 0 0 0 10px rgba(255,68,68,0);
-            }
-            100% {
-                box-shadow: 0 0 0 0 rgba(255,68,68,0);
-            }
-        }
-
-        .new-emergency {
-            animation: pulse 2s infinite;
+            0% { box-shadow: 0 0 0 0 rgba(255,68,68,0.7); }
+            50% { box-shadow: 0 0 0 10px rgba(255,68,68,0); }
+            100% { box-shadow: 0 0 0 0 rgba(255,68,68,0); }
         }
 
         .copy-notification {
@@ -1184,6 +1166,31 @@
             to {
                 transform: translateY(0);
                 opacity: 1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .emergencies-grid,
+            .users-groups-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .filter-bar {
+                flex-direction: column;
+            }
+            
+            .sound-toggle {
+                margin-left: 0;
+            }
+            
+            .header-right {
+                flex-direction: column;
+                width: 100%;
+            }
+            
+            .codes-grid,
+            .admins-grid {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -1267,7 +1274,7 @@
                 </div>
                 <div class="sound-toggle">
                     <span>🔊 Sound Alerts</span>
-                    <button id="soundToggleBtn" onclick="toggleSound()">🔊 On</button>
+                    <button id="soundToggleBtn" onclick="toggleSound()" class="sound-on">🔊 On</button>
                 </div>
             </div>
 
@@ -1544,11 +1551,11 @@
     </div>
 
     <!-- User Detail Modal -->
-    <div id="userDetailModal" class="user-detail-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 2000;">
-        <div class="user-detail-content" style="background: white; border-radius: 20px; padding: 30px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;">
+    <div id="userDetailModal" class="modal" style="display: none;">
+        <div class="modal-content">
             <h3 id="userDetailName">User Details</h3>
             <div id="userDetailInfo"></div>
-            <button class="btn-primary" onclick="closeUserDetail()" style="margin-top: 20px;">Close</button>
+            <button class="btn-primary" onclick="closeModal('userDetailModal')" style="margin-top: 20px;">Close</button>
         </div>
     </div>
 
@@ -1572,6 +1579,7 @@
         // Collections
         const USERS_COLLECTION = 'registered_users';
         const EMERGENCIES_COLLECTION = 'emergencies';
+        const LOCATION_HISTORY_COLLECTION = 'location_history';
         const CODES_COLLECTION = 'registration_codes';
         const GROUPS_COLLECTION = 'groups';
         const ADMINS_COLLECTION = 'admins';
@@ -1586,9 +1594,14 @@
         let soundEnabled = true;
         let currentFilter = 'all';
         let selectedGroupId = null;
-        let audio = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
-        audio.loop = true;
-        let emergencyTimers = {};
+        
+        // Audio for alerts
+        let alertAudio = new Audio();
+        alertAudio.loop = true;
+        alertAudio.src = 'https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3';
+        
+        // Keep track of processed emergencies to avoid duplicate sounds
+        let processedEmergencies = new Set();
 
         // Check authentication
         auth.onAuthStateChanged(async (user) => {
@@ -1763,10 +1776,37 @@
             clearRoute();
         }
 
+        // Toggle sound
+        window.toggleSound = function() {
+            soundEnabled = !soundEnabled;
+            const soundBtn = document.getElementById('soundToggleBtn');
+            
+            if (soundEnabled) {
+                soundBtn.innerHTML = '🔊 On';
+                soundBtn.className = 'sound-on';
+                // Stop any playing sound
+                alertAudio.pause();
+                alertAudio.currentTime = 0;
+            } else {
+                soundBtn.innerHTML = '🔇 Off';
+                soundBtn.className = 'sound-off';
+                // Stop any playing sound
+                alertAudio.pause();
+                alertAudio.currentTime = 0;
+            }
+        };
+
         // Play alert sound
         function playAlertSound() {
             if (soundEnabled) {
-                audio.play().catch(e => console.log('Audio play failed:', e));
+                // Create a new audio instance each time to avoid issues
+                const sound = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
+                sound.volume = 0.7;
+                sound.play().catch(e => console.log('Audio play failed:', e));
+                
+                // Also try with the stored audio
+                alertAudio.currentTime = 0;
+                alertAudio.play().catch(e => console.log('Alert audio failed:', e));
             }
         }
 
@@ -1782,9 +1822,12 @@
                     const data = doc.data();
                     data.id = doc.id;
                     
+                    // Get location from either location or currentLocation field
+                    const location = data.currentLocation || data.location || null;
+                    
                     // Apply filter
                     if (currentFilter === 'all' || data.status === currentFilter) {
-                        filteredEmergencies.push(data);
+                        filteredEmergencies.push({...data, location});
                     }
                 });
                 
@@ -1818,10 +1861,14 @@
                         let markerColor = emergency.status === 'active' ? '#ff4d4d' : '#ffc107';
                         let statusText = emergency.status === 'active' ? 'ACTIVE' : 'IN PROGRESS';
                         
+                        // Get update number if available
+                        const updateInfo = emergency.location.updateNumber ? ` (Update #${emergency.location.updateNumber})` : '';
+                        
                         marker.bindPopup(`
                             <b>${emergency.userName}</b><br>
-                            <span style="color: ${markerColor}; font-weight: bold;">${statusText}</span><br>
-                            Time: ${new Date(emergency.timestamp?.seconds * 1000).toLocaleString()}
+                            <span style="color: ${markerColor}; font-weight: bold;">${statusText}${updateInfo}</span><br>
+                            Time: ${new Date(emergency.timestamp?.seconds * 1000).toLocaleString()}<br>
+                            Accuracy: ${emergency.location.accuracy ? Math.round(emergency.location.accuracy) + 'm' : 'N/A'}
                         `);
                         
                         marker.on('click', () => selectEmergency(emergency));
@@ -1829,23 +1876,47 @@
                     }
                 });
                 
-                // Check for new emergencies
+                // Check for new emergencies and play sound
                 snapshot.docChanges().forEach(change => {
-                    if (change.type === 'added' && change.doc.data().status === 'active') {
-                        playAlertSound();
-                        loadStats();
+                    if (change.type === 'added') {
+                        const newEmergency = change.doc.data();
+                        // Only play sound for new active emergencies that haven't been processed
+                        if (newEmergency.status === 'active' && !processedEmergencies.has(change.doc.id)) {
+                            processedEmergencies.add(change.doc.id);
+                            playAlertSound();
+                            
+                            // Add new emergency class to the item for visual effect
+                            setTimeout(() => {
+                                const newItem = Array.from(document.querySelectorAll('.emergency-item')).find(
+                                    item => item.getAttribute('data-id') === change.doc.id
+                                );
+                                if (newItem) {
+                                    newItem.classList.add('new-emergency');
+                                    setTimeout(() => newItem.classList.remove('new-emergency'), 3000);
+                                }
+                            }, 100);
+                        }
                     }
                 });
+                
+                loadStats();
             });
         }
 
-        // Create emergency item
+        // Create emergency item with location from either field
         function createEmergencyItem(emergency) {
             const div = document.createElement('div');
             div.className = `emergency-item ${emergency.status} ${emergency.id === selectedEmergencyId ? 'active' : ''}`;
+            div.setAttribute('data-id', emergency.id);
             div.ondblclick = () => selectEmergency(emergency);
             
             const time = emergency.timestamp ? new Date(emergency.timestamp.seconds * 1000).toLocaleString() : 'Just now';
+            
+            // Get location from either field
+            const location = emergency.location || emergency.currentLocation || null;
+            const locationText = location ? 
+                `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` + (location.updateNumber ? ` (#${location.updateNumber})` : '') : 
+                'No location';
             
             let statusBadge = '';
             let operatorInfo = '';
@@ -1874,9 +1945,10 @@
                 </div>
                 <div class="emergency-details">
                     <div>📞 ${emergency.contactNumber}</div>
-                    <div>📍 ${emergency.location?.lat.toFixed(4)}, ${emergency.location?.lng.toFixed(4)}</div>
+                    <div>📍 ${locationText}</div>
                     <div>⏰ ${time}</div>
                     <div>👥 ${emergency.groupName || 'No Group'}</div>
+                    ${location?.accuracy ? `<div>🎯 Accuracy: ${Math.round(location.accuracy)}m</div>` : ''}
                 </div>
                 <div class="emergency-actions">
                     ${emergency.status === 'active' ? `
@@ -1908,9 +1980,56 @@
                     // Clear existing markers and route
                     clearMarkersAndRoute();
                     
+                    // Get location history
+                    const historySnapshot = await db.collection(LOCATION_HISTORY_COLLECTION)
+                        .where('emergencyId', '==', emergencyId)
+                        .orderBy('sequence')
+                        .get();
+                    
+                    const locations = [];
+                    historySnapshot.forEach(doc => {
+                        locations.push(doc.data());
+                    });
+                    
                     // Show the emergency location with history
-                    if (emergency.location) {
-                        // Add marker for final location
+                    if (locations.length > 0) {
+                        // Add markers for all locations
+                        locations.forEach((loc, index) => {
+                            const marker = L.marker([loc.location.lat, loc.location.lng]).addTo(map);
+                            marker.bindPopup(`
+                                <b>${emergency.userName}</b><br>
+                                <span style="color: #28a745; font-weight: bold;">Update #${loc.sequence}</span><br>
+                                Time: ${loc.clientTimestamp ? new Date(loc.clientTimestamp).toLocaleString() : 'N/A'}<br>
+                                Accuracy: ${loc.location.accuracy ? Math.round(loc.location.accuracy) + 'm' : 'N/A'}
+                            `);
+                            
+                            // Color markers based on sequence
+                            const hue = (index / locations.length) * 120; // Green spectrum
+                            marker._icon.style.filter = `hue-rotate(${hue}deg)`;
+                        });
+                        
+                        // Center map on first location
+                        map.setView([locations[0].location.lat, locations[0].location.lng], 14);
+                        
+                        // Draw route if there are multiple points
+                        if (locations.length > 1) {
+                            const waypoints = locations.map(loc => 
+                                L.latLng(loc.location.lat, loc.location.lng)
+                            );
+                            
+                            routingControl = L.Routing.control({
+                                waypoints: waypoints,
+                                routeWhileDragging: false,
+                                addWaypoints: false,
+                                draggableWaypoints: false,
+                                fitSelectedRoutes: true,
+                                showAlternatives: false
+                            }).addTo(map);
+                        }
+                        
+                        showEmergencyHistory(emergency, locations);
+                    } else if (emergency.location) {
+                        // Fallback to single location
                         const marker = L.marker([emergency.location.lat, emergency.location.lng]).addTo(map);
                         marker.bindPopup(`
                             <b>${emergency.userName}</b><br>
@@ -1918,12 +2037,8 @@
                             Completed: ${emergency.completedAt ? new Date(emergency.completedAt.seconds * 1000).toLocaleString() : 'N/A'}
                         `);
                         mapMarkers[emergency.id] = marker;
-                        
-                        // Center map on location
                         map.setView([emergency.location.lat, emergency.location.lng], 14);
-                        
-                        // Show history timeline
-                        showEmergencyHistory(emergency);
+                        showEmergencyHistory(emergency, []);
                     }
                 }
             } catch (error) {
@@ -1932,7 +2047,7 @@
         };
 
         // Show emergency history
-        function showEmergencyHistory(emergency) {
+        function showEmergencyHistory(emergency, locations) {
             const infoDiv = document.getElementById('selectedEmergencyInfo');
             
             const receivedTime = emergency.timestamp ? new Date(emergency.timestamp.seconds * 1000) : null;
@@ -1951,6 +2066,22 @@
             if (receivedTime && completedTime) {
                 const totalMinutes = Math.round((completedTime - receivedTime) / 60000);
                 totalTime = `${totalMinutes} minutes`;
+            }
+            
+            // Create location history timeline
+            let locationHistoryHTML = '';
+            if (locations.length > 0) {
+                locationHistoryHTML = '<h5 style="margin-top: 10px;">📍 Location Updates</h5>';
+                locations.forEach(loc => {
+                    const time = loc.clientTimestamp ? new Date(loc.clientTimestamp).toLocaleString() : 'N/A';
+                    locationHistoryHTML += `
+                        <div class="timeline-item" style="border-left-color: #17a2b8;">
+                            <div class="timeline-time">#${loc.sequence} - ${time}</div>
+                            <div>${loc.location.lat.toFixed(6)}, ${loc.location.lng.toFixed(6)}</div>
+                            <div>Accuracy: ${loc.location.accuracy ? Math.round(loc.location.accuracy) + 'm' : 'N/A'}</div>
+                        </div>
+                    `;
+                });
             }
             
             infoDiv.innerHTML = `
@@ -1974,7 +2105,12 @@
                         </div>
                     ` : ''}
                 </div>
+                ${locationHistoryHTML}
                 <div class="route-stats">
+                    <div class="stat-item">
+                        <div class="stat-value">${locations.length}</div>
+                        <div class="stat-label-small">Location Updates</div>
+                    </div>
                     <div class="stat-item">
                         <div class="stat-value">${responseTime || 'N/A'}</div>
                         <div class="stat-label-small">Response Time</div>
@@ -1998,8 +2134,8 @@
                         <span class="info-value">${emergency.groupName || 'N/A'}</span>
                     </div>
                     <div class="info-item">
-                        <span class="info-label">Location</span>
-                        <span class="info-value">${emergency.location?.lat.toFixed(4)}, ${emergency.location?.lng.toFixed(4)}</span>
+                        <span class="info-label">Total Updates</span>
+                        <span class="info-value">${emergency.locationUpdateCount || locations.length || 0}</span>
                     </div>
                 </div>
             `;
@@ -2017,13 +2153,16 @@
             });
             event?.target.closest('.emergency-item')?.classList.add('active');
             
+            // Get location from either field
+            const location = emergency.location || emergency.currentLocation || null;
+            
             // Center map and show info for active/in-progress emergencies
-            if (emergency.location && map) {
+            if (location && map) {
                 // Clear any existing route
                 clearRoute();
                 
                 // Center map on location
-                map.setView([emergency.location.lat, emergency.location.lng], 15);
+                map.setView([location.lat, location.lng], 15);
                 
                 // Show info
                 const infoDiv = document.getElementById('selectedEmergencyInfo');
@@ -2054,8 +2193,20 @@
                         </div>
                         <div class="info-item">
                             <span class="info-label">Location</span>
-                            <span class="info-value">${emergency.location?.lat.toFixed(4)}, ${emergency.location?.lng.toFixed(4)}</span>
+                            <span class="info-value">${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}</span>
                         </div>
+                        ${location.updateNumber ? `
+                        <div class="info-item">
+                            <span class="info-label">Update #</span>
+                            <span class="info-value">${location.updateNumber}</span>
+                        </div>
+                        ` : ''}
+                        ${location.accuracy ? `
+                        <div class="info-item">
+                            <span class="info-label">Accuracy</span>
+                            <span class="info-value">${Math.round(location.accuracy)}m</span>
+                        </div>
+                        ` : ''}
                     </div>
                     ${emergency.handledBy ? `
                         <div style="margin-top: 10px; padding: 10px; background: #e3f2fd; border-radius: 5px;">
@@ -2335,7 +2486,8 @@
                         html += `
                             <div style="padding: 10px; border-bottom: 1px solid #e0e0e0;">
                                 <strong>${user.firstName} ${user.lastName}</strong><br>
-                                <span style="font-size: 12px; color: #666;">${user.email}</span>
+                                <span style="font-size: 12px; color: #666;">${user.email}</span><br>
+                                <span style="font-size: 11px; color: #999;">${user.contactNumber || 'No contact'}</span>
                             </div>
                         `;
                     });
@@ -2924,29 +3076,29 @@
                             <th style="padding: 12px; text-align: left;">Location</th>
                             <th style="padding: 12px; text-align: left;">Status</th>
                             <th style="padding: 12px; text-align: left;">Handled By</th>
-                            <th style="padding: 12px; text-align: left;">Response Time</th>
-                            <th style="padding: 12px; text-align: left;">Total Duration</th>
+                            <th style="padding: 12px; text-align: left;">Updates</th>
                         </tr>
                     </thead>
                     <tbody>
             `;
             
-            snapshot.forEach(doc => {
+            for (const doc of snapshot.docs) {
                 const data = doc.data();
                 const date = data.timestamp ? new Date(data.timestamp.seconds * 1000).toLocaleString('en-PH') : 'Unknown';
                 
-                // Calculate times
-                let responseTime = 'N/A';
-                let totalDuration = 'N/A';
+                // Get location
+                const location = data.currentLocation || data.location || null;
+                const locationText = location ? 
+                    `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` + (location.updateNumber ? ` (#${location.updateNumber})` : '') : 
+                    'No location';
                 
-                if (data.timestamp && data.handledAt) {
-                    const responseMinutes = Math.round((data.handledAt.seconds - data.timestamp.seconds) / 60);
-                    responseTime = `${responseMinutes} min`;
-                }
-                
-                if (data.timestamp && data.completedAt) {
-                    const totalMinutes = Math.round((data.completedAt.seconds - data.timestamp.seconds) / 60);
-                    totalDuration = `${totalMinutes} min`;
+                // Get update count from location history
+                let updateCount = data.locationUpdateCount || 0;
+                if (!updateCount) {
+                    const historySnapshot = await db.collection(LOCATION_HISTORY_COLLECTION)
+                        .where('emergencyId', '==', doc.id)
+                        .get();
+                    updateCount = historySnapshot.size;
                 }
                 
                 reportHTML += `
@@ -2955,14 +3107,13 @@
                         <td style="padding: 12px; border-bottom: 1px solid #e0e0e0;">${data.userName || 'Unknown'}</td>
                         <td style="padding: 12px; border-bottom: 1px solid #e0e0e0;">${data.groupName || 'N/A'}</td>
                         <td style="padding: 12px; border-bottom: 1px solid #e0e0e0;">${data.contactNumber || 'N/A'}</td>
-                        <td style="padding: 12px; border-bottom: 1px solid #e0e0e0;">${data.location ? `${data.location.lat.toFixed(4)}, ${data.location.lng.toFixed(4)}` : 'N/A'}</td>
+                        <td style="padding: 12px; border-bottom: 1px solid #e0e0e0;">${locationText}</td>
                         <td style="padding: 12px; border-bottom: 1px solid #e0e0e0;">${data.status || 'unknown'}</td>
                         <td style="padding: 12px; border-bottom: 1px solid #e0e0e0;">${data.handledByName || 'N/A'}</td>
-                        <td style="padding: 12px; border-bottom: 1px solid #e0e0e0;">${responseTime}</td>
-                        <td style="padding: 12px; border-bottom: 1px solid #e0e0e0;">${totalDuration}</td>
+                        <td style="padding: 12px; border-bottom: 1px solid #e0e0e0;">${updateCount}</td>
                     </tr>
                 `;
-            });
+            }
             
             reportHTML += '</tbody></table>';
             reportDiv.innerHTML = reportHTML;
@@ -3009,10 +3160,6 @@
                 const activeSnapshot = await db.collection(EMERGENCIES_COLLECTION).where('status', '==', 'active').get();
                 document.getElementById('activeEmergencies').textContent = activeSnapshot.size;
                 
-                // In Progress Emergencies
-                const inProgressSnapshot = await db.collection(EMERGENCIES_COLLECTION).where('status', '==', 'in-progress').get();
-                document.getElementById('inProgressEmergencies').textContent = inProgressSnapshot.size;
-                
                 // Completed Emergencies
                 const completedSnapshot = await db.collection(EMERGENCIES_COLLECTION).where('status', '==', 'completed').get();
                 document.getElementById('completedEmergencies').textContent = completedSnapshot.size;
@@ -3028,7 +3175,11 @@
                 .onSnapshot((snapshot) => {
                     snapshot.docChanges().forEach((change) => {
                         if (change.type === 'added') {
-                            playAlertSound();
+                            // Play sound for new active emergencies
+                            if (!processedEmergencies.has(change.doc.id)) {
+                                processedEmergencies.add(change.doc.id);
+                                playAlertSound();
+                            }
                             loadStats();
                         }
                     });
@@ -3050,9 +3201,6 @@
         // Close modal when clicking outside
         window.addEventListener('click', (e) => {
             if (e.target.classList.contains('modal')) {
-                e.target.style.display = 'none';
-            }
-            if (e.target.classList.contains('user-detail-modal')) {
                 e.target.style.display = 'none';
             }
         });
@@ -3080,11 +3228,6 @@
             
             document.getElementById('userDetailName').textContent = `${user.firstName} ${user.lastName}`;
             modal.style.display = 'flex';
-        };
-
-        // Close user detail
-        window.closeUserDetail = function() {
-            document.getElementById('userDetailModal').style.display = 'none';
         };
     </script>
 </body>
