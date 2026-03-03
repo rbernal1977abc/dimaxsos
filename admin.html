@@ -15,7 +15,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
     <style>
-        /* All your existing styles remain exactly the same */
+        /* Keep all your existing styles exactly the same */
         * {
             margin: 0;
             padding: 0;
@@ -1667,6 +1667,16 @@
         const auth = firebase.auth();
         const db = firebase.firestore();
 
+        // Enable persistence for better performance
+        db.enablePersistence()
+            .catch((err) => {
+                if (err.code === 'failed-precondition') {
+                    console.log('Multiple tabs open, persistence enabled in one tab only');
+                } else if (err.code === 'unimplemented') {
+                    console.log('Browser doesn\'t support persistence');
+                }
+            });
+
         // Collections
         const USERS_COLLECTION = 'registered_users';
         const EMERGENCIES_COLLECTION = 'emergencies';
@@ -1718,7 +1728,11 @@
                         document.getElementById('adminName').textContent = adminDoc.data().firstName + ' ' + adminDoc.data().lastName;
                         document.getElementById('adminRole').textContent = currentUserRole === 'admin' ? 'Super Admin' : 'Operator';
                         
-                        initMap();
+                        // Initialize map with a slight delay to ensure container is ready
+                        setTimeout(() => {
+                            initMap();
+                        }, 500);
+                        
                         startForceRefresh();
                         setupAggressiveRealTimeListener();
                         await loadInitialEmergencies();
@@ -1960,6 +1974,14 @@
             }
         }
 
+        // Clear all markers from map
+        function clearAllMarkers() {
+            for (let id in mapMarkers) {
+                map.removeLayer(mapMarkers[id]);
+            }
+            mapMarkers = {};
+        }
+
         // Switch tabs
         window.switchTab = function(tab) {
             const tabs = document.querySelectorAll('.nav-tab');
@@ -1972,9 +1994,12 @@
                 tabs[0].classList.add('active');
                 document.getElementById('emergenciesTab').classList.add('active');
                 setTimeout(() => {
-                    if (map) map.invalidateSize();
+                    if (map) {
+                        map.invalidateSize();
+                        // Refresh markers
+                        refreshEmergenciesForce();
+                    }
                 }, 100);
-                refreshEmergenciesForce();
             } else if (tab === 'users-groups') {
                 tabs[1].classList.add('active');
                 document.getElementById('usersGroupsTab').classList.add('active');
@@ -1999,18 +2024,10 @@
             currentFilter = filter;
             document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
             event.target.classList.add('active');
-            clearMarkersAndRoute();
+            clearAllMarkers();
+            clearRoute();
             loadInitialEmergencies();
         };
-
-        // Clear markers and route
-        function clearMarkersAndRoute() {
-            for (let id in mapMarkers) {
-                map.removeLayer(mapMarkers[id]);
-            }
-            mapMarkers = {};
-            clearRoute();
-        }
 
         // Toggle sound
         window.toggleSound = function() {
@@ -2145,6 +2162,8 @@
                     map.removeLayer(mapMarkers[emergency.id]);
                     delete mapMarkers[emergency.id];
                 }
+            } else if (emergency.currentLocation && (emergency.status === 'active' || emergency.status === 'in-progress')) {
+                updateEmergencyMarker(emergency.id, emergency);
             }
         }
 
@@ -2168,6 +2187,9 @@
                 
                 const emergenciesList = document.getElementById('emergenciesList');
                 emergenciesList.innerHTML = '';
+                
+                // Clear existing markers
+                clearAllMarkers();
                 
                 let emergencyCount = 0;
                 
@@ -2196,9 +2218,15 @@
                         const emergencyItem = createEmergencyItem(emergency);
                         emergenciesList.appendChild(emergencyItem);
                         
+                        // Add marker to map for active/in-progress emergencies
                         if (emergency.currentLocation && (emergency.status === 'active' || emergency.status === 'in-progress')) {
-                            updateEmergencyMarker(emergency.id, emergency);
+                            addMarkerToMap(emergency.id, emergency);
                         }
+                    }
+                    
+                    // Setup location listener for active emergencies
+                    if (emergency.status === 'active' || emergency.status === 'in-progress') {
+                        setupLocationListener(emergency.id);
                     }
                 }
                 
@@ -2210,6 +2238,47 @@
             } catch (error) {
                 console.error('Force refresh error:', error);
             }
+        }
+
+        // Add marker to map
+        function addMarkerToMap(emergencyId, emergency) {
+            if (!map || !emergency.currentLocation) return;
+            
+            // Remove existing marker if any
+            if (mapMarkers[emergencyId]) {
+                map.removeLayer(mapMarkers[emergencyId]);
+            }
+            
+            // Create custom icon with number
+            const customIcon = L.divIcon({
+                className: 'custom-marker',
+                html: `<div style="background-color: ${emergency.status === 'active' ? '#ff4d4d' : '#ffc107'}; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">${emergency.locationUpdateCount || 0}</div>`,
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            });
+            
+            const marker = L.marker([emergency.currentLocation.lat, emergency.currentLocation.lng], { icon: customIcon }).addTo(map);
+            
+            const time = emergency.timestamp ? new Date(emergency.timestamp.seconds * 1000).toLocaleString() : 'Just now';
+            
+            marker.bindPopup(`
+                <b>${emergency.userName}</b><br>
+                <span style="color: ${emergency.status === 'active' ? '#ff4d4d' : '#ffc107'}; font-weight: bold;">${emergency.status.toUpperCase()}</span><br>
+                <span style="color: #17a2b8;">Update #${emergency.locationUpdateCount || 0}</span><br>
+                Time: ${time}<br>
+                Accuracy: ${emergency.currentLocation.accuracy ? Math.round(emergency.currentLocation.accuracy) + 'm' : 'N/A'}
+            `);
+            
+            marker.on('click', () => {
+                selectEmergency(emergency);
+            });
+            
+            mapMarkers[emergencyId] = marker;
+        }
+
+        // Update emergency marker
+        function updateEmergencyMarker(emergencyId, emergency) {
+            addMarkerToMap(emergencyId, emergency);
         }
 
         // Load initial emergencies
@@ -2258,41 +2327,6 @@
                 const unsubscribe = activeLocationListeners.get(emergencyId);
                 unsubscribe();
                 activeLocationListeners.delete(emergencyId);
-            }
-        }
-
-        // Update emergency marker
-        function updateEmergencyMarker(emergencyId, emergency) {
-            if (!map || !emergency.currentLocation) return;
-            
-            if (mapMarkers[emergencyId]) {
-                map.removeLayer(mapMarkers[emergencyId]);
-            }
-            
-            const marker = L.marker([emergency.currentLocation.lat, emergency.currentLocation.lng]).addTo(map);
-            
-            let markerColor = emergency.status === 'active' ? '#ff4d4d' : '#ffc107';
-            let statusText = emergency.status === 'active' ? 'ACTIVE' : 'IN PROGRESS';
-            
-            const time = emergency.timestamp ? new Date(emergency.timestamp.seconds * 1000).toLocaleString() : 'Just now';
-            
-            marker.bindPopup(`
-                <b>${emergency.userName}</b><br>
-                <span style="color: ${markerColor}; font-weight: bold;">${statusText}</span><br>
-                <span style="color: #17a2b8;">Update #${emergency.locationUpdateCount || 0}</span><br>
-                Time: ${time}<br>
-                Accuracy: ${emergency.currentLocation.accuracy ? Math.round(emergency.currentLocation.accuracy) + 'm' : 'N/A'}
-            `);
-            
-            marker.on('click', () => {
-                selectEmergency(emergency);
-            });
-            
-            mapMarkers[emergencyId] = marker;
-            
-            if (selectedEmergencyId === emergencyId) {
-                map.setView([emergency.currentLocation.lat, emergency.currentLocation.lng], 15);
-                showEmergencyInfo(emergency);
             }
         }
 
@@ -2393,7 +2427,7 @@
             }
         }
 
-        // Create emergency item
+        // Create emergency item with role-based permissions
         function createEmergencyItem(emergency) {
             const div = document.createElement('div');
             div.className = `emergency-item ${emergency.status} ${emergency.id === selectedEmergencyId ? 'active' : ''}`;
@@ -2410,20 +2444,33 @@
             let statusBadge = '';
             let operatorInfo = '';
             let viewButton = '';
+            let deleteButton = '';
             
             switch(emergency.status) {
                 case 'active':
                     statusBadge = '<span class="emergency-badge badge-active">ACTIVE</span>';
                     viewButton = `<button class="action-btn btn-view-location" onclick="event.stopPropagation(); selectEmergency(${JSON.stringify(emergency).replace(/"/g, '&quot;')})">View Location</button>`;
+                    // Only Super Admin can delete active emergencies
+                    if (currentUserRole === 'admin') {
+                        deleteButton = `<button class="action-btn btn-delete" onclick="event.stopPropagation(); deleteEmergency('${emergency.id}')">Delete</button>`;
+                    }
                     break;
                 case 'in-progress':
                     statusBadge = '<span class="emergency-badge badge-in-progress">IN PROGRESS</span>';
                     operatorInfo = emergency.handledBy ? `<span class="operator-badge">👤 ${emergency.handledByName}</span>` : '';
                     viewButton = `<button class="action-btn btn-view-location" onclick="event.stopPropagation(); selectEmergency(${JSON.stringify(emergency).replace(/"/g, '&quot;')})">View Location</button>`;
+                    // Only Super Admin can delete in-progress emergencies
+                    if (currentUserRole === 'admin') {
+                        deleteButton = `<button class="action-btn btn-delete" onclick="event.stopPropagation(); deleteEmergency('${emergency.id}')">Delete</button>`;
+                    }
                     break;
                 case 'completed':
                     statusBadge = '<span class="emergency-badge badge-completed">COMPLETED</span>';
                     viewButton = `<button class="action-btn btn-view-history" onclick="event.stopPropagation(); viewEmergencyHistory('${emergency.id}')">View History</button>`;
+                    // Only Super Admin can delete completed emergencies
+                    if (currentUserRole === 'admin') {
+                        deleteButton = `<button class="action-btn btn-delete" onclick="event.stopPropagation(); deleteEmergency('${emergency.id}')">Delete</button>`;
+                    }
                     break;
             }
             
@@ -2447,9 +2494,7 @@
                         <button class="action-btn btn-complete" onclick="event.stopPropagation(); completeEmergency('${emergency.id}')">Complete</button>
                     ` : ''}
                     ${viewButton}
-                    ${currentUserRole === 'admin' ? `
-                        <button class="action-btn btn-delete" onclick="event.stopPropagation(); deleteEmergency('${emergency.id}')">Delete</button>
-                    ` : ''}
+                    ${deleteButton}
                 </div>
             `;
             
@@ -2476,7 +2521,7 @@
             }
         };
 
-        // View emergency history
+        // View emergency history with all location points
         window.viewEmergencyHistory = async function(emergencyId) {
             try {
                 const doc = await db.collection(EMERGENCIES_COLLECTION).doc(emergencyId).get();
@@ -2484,8 +2529,11 @@
                     const emergency = doc.data();
                     emergency.id = doc.id;
                     
-                    clearMarkersAndRoute();
+                    // Clear existing markers and route
+                    clearAllMarkers();
+                    clearRoute();
                     
+                    // Get all location history in order
                     const historySnapshot = await db.collection(LOCATION_HISTORY_COLLECTION)
                         .where('emergencyId', '==', emergencyId)
                         .orderBy('sequence')
@@ -2496,11 +2544,20 @@
                         locations.push(doc.data());
                     });
                     
+                    // Show all locations on map with sequence numbers
                     if (locations.length > 0) {
                         const waypoints = [];
                         
                         locations.forEach((loc, index) => {
-                            const marker = L.marker([loc.location.lat, loc.location.lng]).addTo(map);
+                            // Create custom icon with sequence number
+                            const customIcon = L.divIcon({
+                                className: 'custom-marker',
+                                html: `<div style="background-color: #28a745; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">${loc.sequence}</div>`,
+                                iconSize: [30, 30],
+                                iconAnchor: [15, 15]
+                            });
+                            
+                            const marker = L.marker([loc.location.lat, loc.location.lng], { icon: customIcon }).addTo(map);
                             marker.bindPopup(`
                                 <b>${emergency.userName}</b><br>
                                 <span style="color: #28a745; font-weight: bold;">Update #${loc.sequence}</span><br>
@@ -2511,8 +2568,10 @@
                             waypoints.push(L.latLng(loc.location.lat, loc.location.lng));
                         });
                         
+                        // Center map on first location
                         map.setView([locations[0].location.lat, locations[0].location.lng], 14);
                         
+                        // Draw route if multiple points
                         if (locations.length > 1) {
                             routingControl = L.Routing.control({
                                 waypoints: waypoints,
@@ -2526,7 +2585,15 @@
                         
                         showHistoryInfo(emergency, locations);
                     } else if (emergency.location) {
-                        const marker = L.marker([emergency.location.lat, emergency.location.lng]).addTo(map);
+                        // Fallback to single location
+                        const customIcon = L.divIcon({
+                            className: 'custom-marker',
+                            html: `<div style="background-color: #28a745; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">1</div>`,
+                            iconSize: [30, 30],
+                            iconAnchor: [15, 15]
+                        });
+                        
+                        const marker = L.marker([emergency.location.lat, emergency.location.lng], { icon: customIcon }).addTo(map);
                         marker.bindPopup(`
                             <b>${emergency.userName}</b><br>
                             <span style="color: #28a745; font-weight: bold;">COMPLETED</span>
@@ -2561,6 +2628,7 @@
                 totalTime = `${totalMinutes} min`;
             }
             
+            // Create location history timeline
             let locationHistoryHTML = '';
             if (locations.length > 0) {
                 locationHistoryHTML = '<h5 style="margin-top: 10px;">📍 Location Updates</h5>';
@@ -2662,9 +2730,16 @@
 
         // Delete emergency
         window.deleteEmergency = async function(emergencyId) {
-            if (!confirm('Are you sure you want to delete this emergency?')) return;
+            // Only Super Admin can delete
+            if (currentUserRole !== 'admin') {
+                alert('Only Super Admin can delete emergencies');
+                return;
+            }
+            
+            if (!confirm('Are you sure you want to delete this emergency? This action cannot be undone.')) return;
             
             try {
+                // Delete all location history first
                 const historySnapshot = await db.collection(LOCATION_HISTORY_COLLECTION)
                     .where('emergencyId', '==', emergencyId)
                     .get();
@@ -2674,17 +2749,21 @@
                     batch.delete(doc.ref);
                 });
                 
+                // Delete emergency
                 batch.delete(db.collection(EMERGENCIES_COLLECTION).doc(emergencyId));
                 
                 await batch.commit();
                 
+                // Remove location listener
                 removeLocationListener(emergencyId);
                 
+                // Remove marker
                 if (mapMarkers[emergencyId]) {
                     map.removeLayer(mapMarkers[emergencyId]);
                     delete mapMarkers[emergencyId];
                 }
                 
+                // Clear selected info if this was the selected emergency
                 if (selectedEmergencyId === emergencyId) {
                     document.getElementById('selectedEmergencyInfo').innerHTML = '<h4>Select an emergency to view details</h4>';
                     selectedEmergencyId = null;
