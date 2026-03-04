@@ -474,37 +474,14 @@
             to { transform: rotate(360deg); }
         }
 
-        .sos-logout-btn {
-            background: rgba(255,255,255,0.2);
-            border: 1px solid white;
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 12px;
-            cursor: pointer;
-            margin-left: 10px;
-            transition: all 0.3s ease;
-        }
-
-        .sos-logout-btn:hover {
-            background: rgba(255,255,255,0.3);
-        }
-
-        .sos-header-content {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            width: 100%;
-        }
-
-        /* Location prompt modal */
+        /* Location prompt modal - UPDATED for post-registration */
         .location-prompt {
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.9);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -522,63 +499,81 @@
             padding: 30px;
             max-width: 350px;
             text-align: center;
+            animation: slideUp 0.3s ease;
         }
 
         .location-prompt-content h3 {
             color: #ff4d4d;
             margin-bottom: 15px;
-            font-size: 22px;
+            font-size: 24px;
         }
 
         .location-prompt-content p {
             color: #333;
-            margin-bottom: 25px;
-            line-height: 1.5;
+            margin-bottom: 20px;
+            line-height: 1.6;
+            font-size: 15px;
+        }
+
+        .location-prompt-content .highlight {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            text-align: left;
+        }
+
+        .location-prompt-content .highlight i {
+            color: #ff4d4d;
+            font-style: normal;
+            font-weight: bold;
         }
 
         .location-prompt-buttons {
             display: flex;
             gap: 15px;
             justify-content: center;
+            margin-top: 20px;
         }
 
         .location-prompt-btn {
-            padding: 12px 25px;
+            padding: 14px 25px;
             border: none;
             border-radius: 10px;
             font-weight: bold;
             cursor: pointer;
             transition: all 0.3s ease;
+            font-size: 15px;
         }
 
         .btn-allow {
             background: #28a745;
             color: white;
+            flex: 2;
         }
 
         .btn-allow:hover {
             background: #218838;
             transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(40,167,69,0.3);
         }
 
-        .btn-continue {
+        .btn-later {
             background: #6c757d;
             color: white;
+            flex: 1;
         }
 
-        .btn-continue:hover {
+        .btn-later:hover {
             background: #5a6268;
             transform: translateY(-2px);
         }
 
-        .btn-cancel {
-            background: #dc3545;
-            color: white;
-        }
-
-        .btn-cancel:hover {
-            background: #c82333;
-            transform: translateY(-2px);
+        .location-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
         }
     </style>
 </head>
@@ -588,15 +583,20 @@
         <div class="loading-spinner"></div>
     </div>
 
-    <!-- Location permission prompt -->
+    <!-- Location permission prompt - UPDATED with new message -->
     <div id="locationPrompt" class="location-prompt hidden">
         <div class="location-prompt-content">
-            <h3>📍 Location Access</h3>
-            <p>For emergency services to track your location, please enable location access. You can still send an SOS without location, but responders won't know where you are.</p>
+            <div class="location-icon">📍</div>
+            <h3>Enable Location Access</h3>
+            <p>To ensure your safety during emergencies, please enable location services on your device.</p>
+            <div class="highlight">
+                <i>📱 For Safari users:</i> Please set location access to <strong>"While Using the App"</strong> when prompted.<br><br>
+                This allows responders to track your location in real-time during an emergency.
+            </div>
+            <p>You can always enable location later in your browser settings.</p>
             <div class="location-prompt-buttons">
-                <button id="allowLocationBtn" class="location-prompt-btn btn-allow">Allow Location</button>
-                <button id="continueWithoutLocationBtn" class="location-prompt-btn btn-continue">Continue without Location</button>
-                <button id="cancelSOSBtn" class="location-prompt-btn btn-cancel">Cancel SOS</button>
+                <button id="allowLocationBtn" class="location-prompt-btn btn-allow">Enable Location</button>
+                <button id="laterLocationBtn" class="location-prompt-btn btn-later">Later</button>
             </div>
         </div>
     </div>
@@ -671,13 +671,10 @@
             </div>
         </div>
 
-        <!-- SOS Page -->
+        <!-- SOS Page - REMOVED LOGOUT BUTTON -->
         <div id="sosPage" class="sos-page">
             <div class="sos-header">
-                <div class="sos-header-content">
-                    <span class="sos-logo">DIMAX Emergency</span>
-                    <button id="sosLogoutBtn" class="sos-logout-btn">Logout</button>
-                </div>
+                <span class="sos-logo">DIMAX Emergency</span>
             </div>
             
             <div class="sos-content">
@@ -752,20 +749,48 @@
         let nextUpdateTimer = null;
         let lastLocationPosition = null;
         let authCheckInProgress = false;
-        let pendingSOS = false; // Track if SOS was pressed while waiting for location permission
+        let pendingSOS = false;
+        let locationPromptShown = false; // Track if prompt has been shown
 
         // Elements
         const loadingOverlay = document.getElementById('loadingOverlay');
         const sosButton = document.getElementById('sosButton');
         const statusDiv = document.getElementById('sosStatus');
         const locationNote = document.getElementById('locationNote');
-        const sosLogoutBtn = document.getElementById('sosLogoutBtn');
         const locationPrompt = document.getElementById('locationPrompt');
         const allowLocationBtn = document.getElementById('allowLocationBtn');
-        const continueWithoutLocationBtn = document.getElementById('continueWithoutLocationBtn');
-        const cancelSOSBtn = document.getElementById('cancelSOSBtn');
+        const laterLocationBtn = document.getElementById('laterLocationBtn');
 
-        // ===== FIXED: Location permission handling for all browsers =====
+        // ===== LOCATION PROMPT HANDLERS =====
+        allowLocationBtn.addEventListener('click', async () => {
+            locationPrompt.classList.add('hidden');
+            // Try to get location permission
+            try {
+                const position = await requestLocation();
+                statusDiv.innerHTML = '✅ Location access granted!';
+                statusDiv.className = 'status-message success';
+                setTimeout(() => {
+                    statusDiv.innerHTML = '';
+                }, 3000);
+            } catch (error) {
+                statusDiv.innerHTML = '❌ Location access denied';
+                statusDiv.className = 'status-message error';
+                setTimeout(() => {
+                    statusDiv.innerHTML = '';
+                }, 3000);
+            }
+        });
+
+        laterLocationBtn.addEventListener('click', () => {
+            locationPrompt.classList.add('hidden');
+            statusDiv.innerHTML = 'ℹ️ You can enable location anytime in browser settings';
+            statusDiv.className = 'status-message info';
+            setTimeout(() => {
+                statusDiv.innerHTML = '';
+            }, 3000);
+        });
+
+        // ===== AUTH STATE HANDLER =====
         auth.onAuthStateChanged(async (user) => {
             console.log('Auth state changed:', user ? 'Logged in' : 'Logged out');
             
@@ -817,6 +842,9 @@
                         
                         showSOSPage();
                         
+                        // Show location prompt only for new registrations (not on every login)
+                        // We'll track this in the registration flow
+                        
                     } catch (error) {
                         console.error('Error verifying user:', error);
                         await auth.signOut();
@@ -834,34 +862,107 @@
             }
         });
 
-        // ===== LOCATION PROMPT HANDLERS =====
-        allowLocationBtn.addEventListener('click', async () => {
-            locationPrompt.classList.add('hidden');
-            if (pendingSOS) {
-                pendingSOS = false;
-                await startSOSWithLocation();
+        // ===== REGISTRATION - SHOW LOCATION PROMPT AFTER SUCCESS =====
+        document.getElementById('registerFormElement').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const registerMsg = document.getElementById('registerMessage');
+            registerMsg.innerHTML = '⏳ Registering...';
+            registerMsg.className = 'message info';
+            
+            const firstName = document.getElementById('firstName').value;
+            const lastName = document.getElementById('lastName').value;
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPassword').value;
+            const contactNumber = document.getElementById('contactNumber').value;
+            const regCode = document.getElementById('regCode').value;
+            
+            try {
+                const codeSnapshot = await db.collection(CODES_COLLECTION)
+                    .where('code', '==', regCode)
+                    .get();
+
+                if (codeSnapshot.empty) {
+                    registerMsg.innerHTML = '❌ Invalid registration code';
+                    registerMsg.className = 'message error';
+                    return;
+                }
+
+                const codeDoc = codeSnapshot.docs[0];
+                const codeData = codeDoc.data();
+                
+                const groupDoc = await db.collection(GROUPS_COLLECTION).doc(codeData.groupId).get();
+                
+                if (!groupDoc.exists) {
+                    registerMsg.innerHTML = '❌ Group not found';
+                    registerMsg.className = 'message error';
+                    return;
+                }
+                
+                const userCred = await auth.createUserWithEmailAndPassword(email, password);
+                
+                await db.collection(USERS_COLLECTION).doc(userCred.user.uid).set({
+                    userId: userCred.user.uid,
+                    firstName: firstName,
+                    lastName: lastName,
+                    email: email,
+                    contactNumber: contactNumber,
+                    groupId: codeData.groupId,
+                    groupName: groupDoc.data().name,
+                    registeredAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    status: 'active',
+                    registeredWithCode: regCode,
+                    locationPromptShown: false // Track if we've shown the prompt
+                });
+
+                await codeDoc.ref.update({
+                    lastUsedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    usageCount: firebase.firestore.FieldValue.increment(1)
+                }).catch(() => {});
+
+                registerMsg.innerHTML = '✅ Registration successful!';
+                registerMsg.className = 'message success';
+                
+                // Show location prompt after successful registration
+                setTimeout(() => {
+                    locationPrompt.classList.remove('hidden');
+                }, 1000);
+                
+            } catch (error) {
+                console.error('Registration error:', error);
+                
+                if (error.code === 'auth/email-already-in-use') {
+                    registerMsg.innerHTML = '❌ Email already registered';
+                } else if (error.code === 'auth/weak-password') {
+                    registerMsg.innerHTML = '❌ Password too weak (min 6 characters)';
+                } else {
+                    registerMsg.innerHTML = '❌ ' + error.message;
+                }
+                registerMsg.className = 'message error';
             }
         });
 
-        continueWithoutLocationBtn.addEventListener('click', async () => {
-            locationPrompt.classList.add('hidden');
-            if (pendingSOS) {
-                pendingSOS = false;
-                await startSOSWithoutLocation();
+        // ===== LOGIN =====
+        document.getElementById('loginFormElement').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const loginMsg = document.getElementById('loginMessage');
+            loginMsg.innerHTML = '⏳ Logging in...';
+            loginMsg.className = 'message info';
+            
+            try {
+                await auth.signInWithEmailAndPassword(
+                    document.getElementById('loginEmail').value,
+                    document.getElementById('loginPassword').value
+                );
+                // Auth state change will handle redirect
+            } catch (error) {
+                loginMsg.innerHTML = '❌ ' + error.message;
+                loginMsg.className = 'message error';
             }
         });
 
-        cancelSOSBtn.addEventListener('click', () => {
-            locationPrompt.classList.add('hidden');
-            pendingSOS = false;
-            statusDiv.innerHTML = '❌ SOS cancelled';
-            statusDiv.className = 'status-message error';
-            setTimeout(() => {
-                statusDiv.innerHTML = '';
-            }, 3000);
-        });
-
-        // ===== FIXED: SOS Button with proper location handling =====
+        // ===== SOS BUTTON HANDLER =====
         sosButton.addEventListener('click', async () => {
             if (isProcessing) return;
             
@@ -869,84 +970,34 @@
                 // STOP Pressed
                 await stopSOS();
             } else {
-                // SOS Pressed - Show location prompt first
-                statusDiv.innerHTML = '📍 Checking location permission...';
+                // SOS Pressed - Try to get location
+                statusDiv.innerHTML = '📍 Getting your location...';
                 statusDiv.className = 'status-message info';
                 
-                // Check if we already have permission
                 try {
-                    // Try to get current position without prompting (checks permission state)
-                    const permission = await checkLocationPermission();
-                    
-                    if (permission === 'granted') {
-                        // Already have permission, proceed with location
-                        await startSOSWithLocation();
-                    } else if (permission === 'prompt') {
-                        // Need to show prompt
-                        pendingSOS = true;
-                        locationPrompt.classList.remove('hidden');
-                    } else {
-                        // Denied - ask if they want to continue without location
-                        pendingSOS = true;
-                        locationPrompt.classList.remove('hidden');
-                    }
+                    const position = await requestLocation();
+                    await startSOSWithLocation(position);
                 } catch (error) {
-                    // Error checking permission, show prompt
-                    pendingSOS = true;
-                    locationPrompt.classList.remove('hidden');
+                    console.error('Location error:', error);
+                    // If location fails, offer to continue without location
+                    if (error.code === 1) {
+                        // Permission denied
+                        statusDiv.innerHTML = '⚠️ Location access denied. Sending SOS without location...';
+                        statusDiv.className = 'status-message warning';
+                        await startSOSWithoutLocation();
+                    } else {
+                        // Other error
+                        statusDiv.innerHTML = '⚠️ Could not get location. Sending SOS without location...';
+                        statusDiv.className = 'status-message warning';
+                        await startSOSWithoutLocation();
+                    }
                 }
             }
         });
 
-        // Helper function to check location permission
-        function checkLocationPermission() {
-            return new Promise((resolve) => {
-                if (!navigator.permissions) {
-                    // Fallback for browsers that don't support permissions API
-                    navigator.geolocation.getCurrentPosition(
-                        () => resolve('granted'),
-                        (error) => {
-                            if (error.code === 1) {
-                                resolve('denied');
-                            } else {
-                                resolve('prompt');
-                            }
-                        },
-                        { timeout: 100 }
-                    );
-                    return;
-                }
-                
-                navigator.permissions.query({ name: 'geolocation' })
-                    .then((result) => {
-                        resolve(result.state);
-                    })
-                    .catch(() => {
-                        // Fallback
-                        navigator.geolocation.getCurrentPosition(
-                            () => resolve('granted'),
-                            (error) => {
-                                if (error.code === 1) {
-                                    resolve('denied');
-                                } else {
-                                    resolve('prompt');
-                                }
-                            },
-                            { timeout: 100 }
-                        );
-                    });
-            });
-        }
-
         // Start SOS with location
-        async function startSOSWithLocation() {
-            statusDiv.innerHTML = '📍 Getting your location...';
-            statusDiv.className = 'status-message info';
-            locationNote.innerHTML = '📍 Please wait...';
-            
+        async function startSOSWithLocation(position) {
             try {
-                const position = await requestLocation();
-                
                 const user = auth.currentUser;
                 if (!user) throw new Error('Not logged in');
 
@@ -994,18 +1045,14 @@
                 activateSOSUI(1, position);
                 
             } catch (error) {
-                console.error('Location error:', error);
-                // If location fails, offer to continue without location
-                pendingSOS = true;
-                locationPrompt.classList.remove('hidden');
+                console.error('SOS error:', error);
+                statusDiv.innerHTML = '❌ Failed to send SOS';
+                statusDiv.className = 'status-message error';
             }
         }
 
         // Start SOS without location
         async function startSOSWithoutLocation() {
-            statusDiv.innerHTML = '📱 Sending SOS without location...';
-            statusDiv.className = 'status-message info';
-            
             try {
                 const user = auth.currentUser;
                 if (!user) throw new Error('Not logged in');
@@ -1117,122 +1164,6 @@
             startTimer();
             startOneMinuteUpdates(currentEmergencyId);
         }
-
-        // Logout handler
-        sosLogoutBtn.addEventListener('click', async () => {
-            try {
-                if (isSOSActive) {
-                    stopTracking();
-                    if (updateInterval) clearInterval(updateInterval);
-                    if (nextUpdateTimer) clearInterval(nextUpdateTimer);
-                    if (timerInterval) clearInterval(timerInterval);
-                }
-                
-                await auth.signOut();
-                
-                resetSOSButton();
-                currentUser = null;
-                currentEmergencyId = null;
-                
-                showLandingPage();
-                
-            } catch (error) {
-                console.error('Logout error:', error);
-            }
-        });
-
-        // ===== REGISTRATION =====
-        document.getElementById('registerFormElement').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const registerMsg = document.getElementById('registerMessage');
-            registerMsg.innerHTML = '⏳ Registering...';
-            registerMsg.className = 'message info';
-            
-            const firstName = document.getElementById('firstName').value;
-            const lastName = document.getElementById('lastName').value;
-            const email = document.getElementById('regEmail').value;
-            const password = document.getElementById('regPassword').value;
-            const contactNumber = document.getElementById('contactNumber').value;
-            const regCode = document.getElementById('regCode').value;
-            
-            try {
-                const codeSnapshot = await db.collection(CODES_COLLECTION)
-                    .where('code', '==', regCode)
-                    .get();
-
-                if (codeSnapshot.empty) {
-                    registerMsg.innerHTML = '❌ Invalid registration code';
-                    registerMsg.className = 'message error';
-                    return;
-                }
-
-                const codeDoc = codeSnapshot.docs[0];
-                const codeData = codeDoc.data();
-                
-                const groupDoc = await db.collection(GROUPS_COLLECTION).doc(codeData.groupId).get();
-                
-                if (!groupDoc.exists) {
-                    registerMsg.innerHTML = '❌ Group not found';
-                    registerMsg.className = 'message error';
-                    return;
-                }
-                
-                const userCred = await auth.createUserWithEmailAndPassword(email, password);
-                
-                await db.collection(USERS_COLLECTION).doc(userCred.user.uid).set({
-                    userId: userCred.user.uid,
-                    firstName: firstName,
-                    lastName: lastName,
-                    email: email,
-                    contactNumber: contactNumber,
-                    groupId: codeData.groupId,
-                    groupName: groupDoc.data().name,
-                    registeredAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    status: 'active',
-                    registeredWithCode: regCode
-                });
-
-                await codeDoc.ref.update({
-                    lastUsedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    usageCount: firebase.firestore.FieldValue.increment(1)
-                }).catch(() => {});
-
-                registerMsg.innerHTML = '✅ Registration successful! Logging in...';
-                registerMsg.className = 'message success';
-                
-            } catch (error) {
-                console.error('Registration error:', error);
-                
-                if (error.code === 'auth/email-already-in-use') {
-                    registerMsg.innerHTML = '❌ Email already registered';
-                } else if (error.code === 'auth/weak-password') {
-                    registerMsg.innerHTML = '❌ Password too weak (min 6 characters)';
-                } else {
-                    registerMsg.innerHTML = '❌ ' + error.message;
-                }
-                registerMsg.className = 'message error';
-            }
-        });
-
-        // ===== LOGIN =====
-        document.getElementById('loginFormElement').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const loginMsg = document.getElementById('loginMessage');
-            loginMsg.innerHTML = '⏳ Logging in...';
-            loginMsg.className = 'message info';
-            
-            try {
-                await auth.signInWithEmailAndPassword(
-                    document.getElementById('loginEmail').value,
-                    document.getElementById('loginPassword').value
-                );
-            } catch (error) {
-                loginMsg.innerHTML = '❌ ' + error.message;
-                loginMsg.className = 'message error';
-            }
-        });
 
         function showSOSPage() {
             document.getElementById('landingPage').style.display = 'none';
