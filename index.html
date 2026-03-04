@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>DIMAX SOS</title>
+    <title>DIMAX SOS - Emergency Response</title>
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
@@ -442,7 +442,6 @@
             display: none !important;
         }
 
-        /* Loading overlay */
         .loading-overlay {
             position: fixed;
             top: 0;
@@ -474,12 +473,132 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+
+        .sos-logout-btn {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid white;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-left: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .sos-logout-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .sos-header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+
+        /* Location prompt modal */
+        .location-prompt {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            padding: 20px;
+        }
+
+        .location-prompt.hidden {
+            display: none;
+        }
+
+        .location-prompt-content {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 350px;
+            text-align: center;
+        }
+
+        .location-prompt-content h3 {
+            color: #ff4d4d;
+            margin-bottom: 15px;
+            font-size: 22px;
+        }
+
+        .location-prompt-content p {
+            color: #333;
+            margin-bottom: 25px;
+            line-height: 1.5;
+        }
+
+        .location-prompt-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+
+        .location-prompt-btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 10px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-allow {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-allow:hover {
+            background: #218838;
+            transform: translateY(-2px);
+        }
+
+        .btn-continue {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-continue:hover {
+            background: #5a6268;
+            transform: translateY(-2px);
+        }
+
+        .btn-cancel {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-cancel:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+        }
     </style>
 </head>
 <body>
     <!-- Loading overlay -->
     <div id="loadingOverlay" class="loading-overlay">
         <div class="loading-spinner"></div>
+    </div>
+
+    <!-- Location permission prompt -->
+    <div id="locationPrompt" class="location-prompt hidden">
+        <div class="location-prompt-content">
+            <h3>📍 Location Access</h3>
+            <p>For emergency services to track your location, please enable location access. You can still send an SOS without location, but responders won't know where you are.</p>
+            <div class="location-prompt-buttons">
+                <button id="allowLocationBtn" class="location-prompt-btn btn-allow">Allow Location</button>
+                <button id="continueWithoutLocationBtn" class="location-prompt-btn btn-continue">Continue without Location</button>
+                <button id="cancelSOSBtn" class="location-prompt-btn btn-cancel">Cancel SOS</button>
+            </div>
+        </div>
     </div>
 
     <div class="full-screen">
@@ -548,14 +667,17 @@
 
             <div class="footer">
                 <span>🚨 DIMAX SOS</span><br>
-                <span>Developed by <span class="company">RP8</span></span>
+                <span>Developed by <span class="company">RP8 & Dimax</span></span>
             </div>
         </div>
 
         <!-- SOS Page -->
         <div id="sosPage" class="sos-page">
             <div class="sos-header">
-                <span class="sos-logo">DIMAX Emergency</span>
+                <div class="sos-header-content">
+                    <span class="sos-logo">DIMAX Emergency</span>
+                    <button id="sosLogoutBtn" class="sos-logout-btn">Logout</button>
+                </div>
             </div>
             
             <div class="sos-content">
@@ -629,78 +751,397 @@
         let updateInterval = null;
         let nextUpdateTimer = null;
         let lastLocationPosition = null;
-        let authInitialized = false;
+        let authCheckInProgress = false;
+        let pendingSOS = false; // Track if SOS was pressed while waiting for location permission
 
         // Elements
         const loadingOverlay = document.getElementById('loadingOverlay');
         const sosButton = document.getElementById('sosButton');
         const statusDiv = document.getElementById('sosStatus');
         const locationNote = document.getElementById('locationNote');
+        const sosLogoutBtn = document.getElementById('sosLogoutBtn');
+        const locationPrompt = document.getElementById('locationPrompt');
+        const allowLocationBtn = document.getElementById('allowLocationBtn');
+        const continueWithoutLocationBtn = document.getElementById('continueWithoutLocationBtn');
+        const cancelSOSBtn = document.getElementById('cancelSOSBtn');
 
-        // ===== FAST AUTO-LOGIN ON PAGE LOAD =====
-        // Hide loading overlay immediately when auth is ready
+        // ===== FIXED: Location permission handling for all browsers =====
         auth.onAuthStateChanged(async (user) => {
             console.log('Auth state changed:', user ? 'Logged in' : 'Logged out');
             
-            if (user) {
-                // User is logged in - immediately show SOS page
-                try {
-                    // Check for active emergency in parallel
-                    const [activeEmergencies, userDoc] = await Promise.all([
-                        db.collection(EMERGENCIES_COLLECTION)
+            if (authCheckInProgress) return;
+            authCheckInProgress = true;
+            
+            try {
+                if (user) {
+                    // Verify user exists in Firestore
+                    try {
+                        const userDoc = await db.collection(USERS_COLLECTION).doc(user.uid).get();
+                        
+                        if (!userDoc.exists) {
+                            console.log('User document not found in Firestore, signing out...');
+                            await auth.signOut();
+                            showLandingPage();
+                            showLoginMessage('Your account has been deleted. Please register again.', 'info');
+                            return;
+                        }
+                        
+                        currentUser = userDoc.data();
+                        
+                        // Check for active emergency
+                        const activeEmergencies = await db.collection(EMERGENCIES_COLLECTION)
                             .where('userId', '==', user.uid)
                             .where('status', '==', 'active')
-                            .get(),
-                        db.collection(USERS_COLLECTION).doc(user.uid).get()
-                    ]);
-                    
-                    if (!activeEmergencies.empty) {
-                        const emergencyDoc = activeEmergencies.docs[0];
-                        currentEmergencyId = emergencyDoc.id;
-                        isSOSActive = true;
-                        
-                        // Get location history count
-                        const historyCount = await db.collection(LOCATION_HISTORY_COLLECTION)
-                            .where('emergencyId', '==', currentEmergencyId)
                             .get();
-                        locationUpdateCount = historyCount.size;
                         
-                        const emergencyData = emergencyDoc.data();
-                        if (emergencyData.timestamp) {
-                            sosStartTime = emergencyData.timestamp.toDate();
+                        if (!activeEmergencies.empty) {
+                            const emergencyDoc = activeEmergencies.docs[0];
+                            currentEmergencyId = emergencyDoc.id;
+                            isSOSActive = true;
+                            
+                            const historyCount = await db.collection(LOCATION_HISTORY_COLLECTION)
+                                .where('emergencyId', '==', currentEmergencyId)
+                                .get();
+                            locationUpdateCount = historyCount.size;
+                            
+                            const emergencyData = emergencyDoc.data();
+                            if (emergencyData.timestamp) {
+                                sosStartTime = emergencyData.timestamp.toDate();
+                            }
+                            
+                            if (emergencyData.currentLocation) {
+                                lastLocationPosition = emergencyData.currentLocation;
+                                lastLocationUpdate = new Date();
+                            }
                         }
                         
-                        if (emergencyData.currentLocation) {
-                            lastLocationPosition = emergencyData.currentLocation;
-                        }
+                        showSOSPage();
+                        
+                    } catch (error) {
+                        console.error('Error verifying user:', error);
+                        await auth.signOut();
+                        showLandingPage();
+                        showLoginMessage('Session error. Please login again.', 'error');
                     }
-                    
-                    if (userDoc.exists) {
-                        currentUser = userDoc.data();
-                    }
-                    
-                    // Show SOS page immediately
-                    showSOSPage();
-                    
-                } catch (error) {
-                    console.error('Error loading user data:', error);
-                    // Still try to show SOS page
-                    showSOSPage();
+                } else {
+                    showLandingPage();
                 }
-            } else {
-                // No user - show landing page
-                showLandingPage();
+            } finally {
+                authCheckInProgress = false;
+                setTimeout(() => {
+                    loadingOverlay.classList.add('hidden');
+                }, 300);
             }
-            
-            // Hide loading overlay
-            setTimeout(() => {
-                loadingOverlay.classList.add('hidden');
-            }, 300);
-            
-            authInitialized = true;
         });
 
-        // ===== FAST REGISTRATION WITH IMMEDIATE LOGIN =====
+        // ===== LOCATION PROMPT HANDLERS =====
+        allowLocationBtn.addEventListener('click', async () => {
+            locationPrompt.classList.add('hidden');
+            if (pendingSOS) {
+                pendingSOS = false;
+                await startSOSWithLocation();
+            }
+        });
+
+        continueWithoutLocationBtn.addEventListener('click', async () => {
+            locationPrompt.classList.add('hidden');
+            if (pendingSOS) {
+                pendingSOS = false;
+                await startSOSWithoutLocation();
+            }
+        });
+
+        cancelSOSBtn.addEventListener('click', () => {
+            locationPrompt.classList.add('hidden');
+            pendingSOS = false;
+            statusDiv.innerHTML = '❌ SOS cancelled';
+            statusDiv.className = 'status-message error';
+            setTimeout(() => {
+                statusDiv.innerHTML = '';
+            }, 3000);
+        });
+
+        // ===== FIXED: SOS Button with proper location handling =====
+        sosButton.addEventListener('click', async () => {
+            if (isProcessing) return;
+            
+            if (isSOSActive) {
+                // STOP Pressed
+                await stopSOS();
+            } else {
+                // SOS Pressed - Show location prompt first
+                statusDiv.innerHTML = '📍 Checking location permission...';
+                statusDiv.className = 'status-message info';
+                
+                // Check if we already have permission
+                try {
+                    // Try to get current position without prompting (checks permission state)
+                    const permission = await checkLocationPermission();
+                    
+                    if (permission === 'granted') {
+                        // Already have permission, proceed with location
+                        await startSOSWithLocation();
+                    } else if (permission === 'prompt') {
+                        // Need to show prompt
+                        pendingSOS = true;
+                        locationPrompt.classList.remove('hidden');
+                    } else {
+                        // Denied - ask if they want to continue without location
+                        pendingSOS = true;
+                        locationPrompt.classList.remove('hidden');
+                    }
+                } catch (error) {
+                    // Error checking permission, show prompt
+                    pendingSOS = true;
+                    locationPrompt.classList.remove('hidden');
+                }
+            }
+        });
+
+        // Helper function to check location permission
+        function checkLocationPermission() {
+            return new Promise((resolve) => {
+                if (!navigator.permissions) {
+                    // Fallback for browsers that don't support permissions API
+                    navigator.geolocation.getCurrentPosition(
+                        () => resolve('granted'),
+                        (error) => {
+                            if (error.code === 1) {
+                                resolve('denied');
+                            } else {
+                                resolve('prompt');
+                            }
+                        },
+                        { timeout: 100 }
+                    );
+                    return;
+                }
+                
+                navigator.permissions.query({ name: 'geolocation' })
+                    .then((result) => {
+                        resolve(result.state);
+                    })
+                    .catch(() => {
+                        // Fallback
+                        navigator.geolocation.getCurrentPosition(
+                            () => resolve('granted'),
+                            (error) => {
+                                if (error.code === 1) {
+                                    resolve('denied');
+                                } else {
+                                    resolve('prompt');
+                                }
+                            },
+                            { timeout: 100 }
+                        );
+                    });
+            });
+        }
+
+        // Start SOS with location
+        async function startSOSWithLocation() {
+            statusDiv.innerHTML = '📍 Getting your location...';
+            statusDiv.className = 'status-message info';
+            locationNote.innerHTML = '📍 Please wait...';
+            
+            try {
+                const position = await requestLocation();
+                
+                const user = auth.currentUser;
+                if (!user) throw new Error('Not logged in');
+
+                const userDoc = await db.collection(USERS_COLLECTION).doc(user.uid).get();
+                const userData = userDoc.data();
+
+                const emergencyData = {
+                    userId: user.uid,
+                    userName: `${userData.firstName} ${userData.lastName}`,
+                    contactNumber: userData.contactNumber,
+                    groupId: userData.groupId,
+                    groupName: userData.groupName,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    status: 'active',
+                    initialLocation: {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude,
+                        accuracy: position.coords.accuracy
+                    },
+                    currentLocation: {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude,
+                        accuracy: position.coords.accuracy,
+                        updateNumber: 1
+                    },
+                    locationUpdateCount: 1
+                };
+
+                const docRef = await db.collection(EMERGENCIES_COLLECTION).add(emergencyData);
+                currentEmergencyId = docRef.id;
+
+                await db.collection(LOCATION_HISTORY_COLLECTION).add({
+                    emergencyId: currentEmergencyId,
+                    userId: user.uid,
+                    sequence: 1,
+                    location: {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude,
+                        accuracy: position.coords.accuracy
+                    },
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    clientTimestamp: new Date().toISOString()
+                });
+
+                activateSOSUI(1, position);
+                
+            } catch (error) {
+                console.error('Location error:', error);
+                // If location fails, offer to continue without location
+                pendingSOS = true;
+                locationPrompt.classList.remove('hidden');
+            }
+        }
+
+        // Start SOS without location
+        async function startSOSWithoutLocation() {
+            statusDiv.innerHTML = '📱 Sending SOS without location...';
+            statusDiv.className = 'status-message info';
+            
+            try {
+                const user = auth.currentUser;
+                if (!user) throw new Error('Not logged in');
+
+                const userDoc = await db.collection(USERS_COLLECTION).doc(user.uid).get();
+                const userData = userDoc.data();
+
+                const emergencyData = {
+                    userId: user.uid,
+                    userName: `${userData.firstName} ${userData.lastName}`,
+                    contactNumber: userData.contactNumber,
+                    groupId: userData.groupId,
+                    groupName: userData.groupName,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    status: 'active',
+                    locationPermission: false,
+                    locationDenied: true
+                };
+
+                const docRef = await db.collection(EMERGENCIES_COLLECTION).add(emergencyData);
+                currentEmergencyId = docRef.id;
+
+                // Activate SOS UI without location counter
+                isSOSActive = true;
+                sosStartTime = new Date();
+                
+                sosButton.classList.add('active');
+                document.querySelector('.sos-instruction').innerHTML = '<span class="sos-engaged">ENGAGED</span><br><span class="sos-press-to-stop">PRESS TO STOP</span>';
+                statusDiv.innerHTML = '✅ SOS Active - No location sharing';
+                statusDiv.className = 'status-message success';
+                locationNote.innerHTML = '📍 Location denied - Responders cannot track you';
+                
+                startTimer();
+                
+            } catch (error) {
+                console.error('SOS error:', error);
+                statusDiv.innerHTML = '❌ Failed to send SOS';
+                statusDiv.className = 'status-message error';
+            }
+        }
+
+        // Stop SOS
+        async function stopSOS() {
+            isProcessing = true;
+            
+            try {
+                stopTracking();
+                
+                if (updateInterval) {
+                    clearInterval(updateInterval);
+                    updateInterval = null;
+                }
+                if (nextUpdateTimer) {
+                    clearInterval(nextUpdateTimer);
+                    nextUpdateTimer = null;
+                }
+                
+                if (currentEmergencyId) {
+                    await db.collection(EMERGENCIES_COLLECTION).doc(currentEmergencyId).update({
+                        status: 'completed',
+                        endedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        totalLocationUpdates: locationUpdateCount,
+                        finalLocation: lastLocationPosition ? {
+                            ...lastLocationPosition,
+                            timestamp: lastLocationUpdate ? lastLocationUpdate.toISOString() : null,
+                            updateNumber: locationUpdateCount
+                        } : null
+                    });
+                }
+                
+                resetSOSButton();
+                statusDiv.innerHTML = '✅ SOS Stopped - Emergency ended';
+                statusDiv.className = 'status-message info';
+                
+            } catch (error) {
+                console.error('Stop SOS error:', error);
+                statusDiv.innerHTML = '❌ Error stopping SOS';
+                statusDiv.className = 'status-message error';
+            } finally {
+                setTimeout(() => {
+                    isProcessing = false;
+                }, 2000);
+            }
+        }
+
+        // Activate SOS UI with location
+        function activateSOSUI(initialCount, position) {
+            isSOSActive = true;
+            locationUpdateCount = initialCount;
+            sosStartTime = new Date();
+            lastLocationUpdate = new Date();
+            lastLocationPosition = {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude,
+                accuracy: position.coords.accuracy
+            };
+            
+            sosButton.classList.add('active');
+            document.querySelector('.sos-instruction').innerHTML = '<span class="sos-engaged">ENGAGED</span><br><span class="sos-press-to-stop">PRESS TO STOP</span>';
+            document.getElementById('locationCounter').classList.remove('hidden');
+            document.getElementById('locationCounter').textContent = locationUpdateCount;
+            document.getElementById('locationCount').textContent = `📍 Updates: ${locationUpdateCount}`;
+            document.getElementById('lastUpdateTime').textContent = 
+                `⏱️ Last: ${new Date().toLocaleTimeString()}`;
+            statusDiv.innerHTML = '✅ SOS Active - Location tracking every 1 minute';
+            statusDiv.className = 'status-message success';
+            locationNote.innerHTML = `📍 Location #${locationUpdateCount} shared`;
+            
+            startTimer();
+            startOneMinuteUpdates(currentEmergencyId);
+        }
+
+        // Logout handler
+        sosLogoutBtn.addEventListener('click', async () => {
+            try {
+                if (isSOSActive) {
+                    stopTracking();
+                    if (updateInterval) clearInterval(updateInterval);
+                    if (nextUpdateTimer) clearInterval(nextUpdateTimer);
+                    if (timerInterval) clearInterval(timerInterval);
+                }
+                
+                await auth.signOut();
+                
+                resetSOSButton();
+                currentUser = null;
+                currentEmergencyId = null;
+                
+                showLandingPage();
+                
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+        });
+
+        // ===== REGISTRATION =====
         document.getElementById('registerFormElement').addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -716,7 +1157,6 @@
             const regCode = document.getElementById('regCode').value;
             
             try {
-                // Find the code
                 const codeSnapshot = await db.collection(CODES_COLLECTION)
                     .where('code', '==', regCode)
                     .get();
@@ -730,7 +1170,6 @@
                 const codeDoc = codeSnapshot.docs[0];
                 const codeData = codeDoc.data();
                 
-                // Get group information
                 const groupDoc = await db.collection(GROUPS_COLLECTION).doc(codeData.groupId).get();
                 
                 if (!groupDoc.exists) {
@@ -739,11 +1178,9 @@
                     return;
                 }
                 
-                // Create user in Firebase Auth
                 const userCred = await auth.createUserWithEmailAndPassword(email, password);
                 
-                // Save user data in Firestore (don't wait for this to complete before showing success)
-                const userSavePromise = db.collection(USERS_COLLECTION).doc(userCred.user.uid).set({
+                await db.collection(USERS_COLLECTION).doc(userCred.user.uid).set({
                     userId: userCred.user.uid,
                     firstName: firstName,
                     lastName: lastName,
@@ -756,27 +1193,13 @@
                     registeredWithCode: regCode
                 });
 
-                // Update usage count (optional)
-                const usageUpdatePromise = codeDoc.ref.update({
+                await codeDoc.ref.update({
                     lastUsedAt: firebase.firestore.FieldValue.serverTimestamp(),
                     usageCount: firebase.firestore.FieldValue.increment(1)
-                }).catch(() => {}); // Ignore errors
+                }).catch(() => {});
 
-                // Show success message immediately
                 registerMsg.innerHTML = '✅ Registration successful! Logging in...';
                 registerMsg.className = 'message success';
-                
-                // Wait for both promises to complete in background
-                Promise.all([userSavePromise, usageUpdatePromise])
-                    .then(() => {
-                        console.log('User data saved successfully');
-                    })
-                    .catch((error) => {
-                        console.error('Background save error:', error);
-                    });
-                
-                // The auth state change will automatically redirect to SOS page
-                // No need to manually redirect
                 
             } catch (error) {
                 console.error('Registration error:', error);
@@ -792,7 +1215,7 @@
             }
         });
 
-        // ===== FAST LOGIN =====
+        // ===== LOGIN =====
         document.getElementById('loginFormElement').addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -805,7 +1228,6 @@
                     document.getElementById('loginEmail').value,
                     document.getElementById('loginPassword').value
                 );
-                // Auth state change will handle redirect
             } catch (error) {
                 loginMsg.innerHTML = '❌ ' + error.message;
                 loginMsg.className = 'message error';
@@ -813,11 +1235,9 @@
         });
 
         function showSOSPage() {
-            // Hide landing page, show SOS page immediately
             document.getElementById('landingPage').style.display = 'none';
             document.getElementById('sosPage').classList.add('active');
             
-            // Update user info
             if (currentUser) {
                 document.getElementById('displayName').textContent = `${currentUser.firstName} ${currentUser.lastName}`;
                 if (currentUser.groupName) {
@@ -825,7 +1245,6 @@
                 }
             }
             
-            // Restore SOS state if active
             if (isSOSActive) {
                 sosButton.classList.add('active');
                 document.querySelector('.sos-instruction').innerHTML = '<span class="sos-engaged">ENGAGED</span><br><span class="sos-press-to-stop">PRESS TO STOP</span>';
@@ -859,6 +1278,14 @@
             resetSOSButton();
         }
 
+        function showLoginMessage(message, type) {
+            const loginMsg = document.getElementById('loginMessage');
+            if (loginMsg) {
+                loginMsg.innerHTML = message;
+                loginMsg.className = `message ${type}`;
+            }
+        }
+
         function resetSOSButton() {
             isSOSActive = false;
             currentEmergencyId = null;
@@ -867,6 +1294,7 @@
             lastLocationUpdate = null;
             lastLocationPosition = null;
             isProcessing = false;
+            pendingSOS = false;
             
             if (timerInterval) {
                 clearInterval(timerInterval);
@@ -1053,174 +1481,6 @@
             }
         }
 
-        // SOS Button click handler
-        sosButton.addEventListener('click', async () => {
-            if (isProcessing) return;
-            
-            isProcessing = true;
-            
-            try {
-                if (isSOSActive) {
-                    // STOP Pressed
-                    stopTracking();
-                    
-                    if (updateInterval) {
-                        clearInterval(updateInterval);
-                        updateInterval = null;
-                    }
-                    if (nextUpdateTimer) {
-                        clearInterval(nextUpdateTimer);
-                        nextUpdateTimer = null;
-                    }
-                    
-                    if (currentEmergencyId) {
-                        await db.collection(EMERGENCIES_COLLECTION).doc(currentEmergencyId).update({
-                            status: 'completed',
-                            endedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                            totalLocationUpdates: locationUpdateCount,
-                            finalLocation: lastLocationPosition ? {
-                                ...lastLocationPosition,
-                                timestamp: lastLocationUpdate ? lastLocationUpdate.toISOString() : null,
-                                updateNumber: locationUpdateCount
-                            } : null
-                        });
-                    }
-                    
-                    resetSOSButton();
-                    statusDiv.innerHTML = '✅ SOS Stopped - Emergency ended';
-                    statusDiv.className = 'status-message info';
-                    
-                } else {
-                    // SOS Pressed
-                    statusDiv.innerHTML = '📍 Asking for location...';
-                    statusDiv.className = 'status-message info';
-                    locationNote.innerHTML = '📍 Please allow location';
-                    
-                    try {
-                        const position = await requestLocation();
-                        
-                        const user = auth.currentUser;
-                        if (!user) throw new Error('Not logged in');
-
-                        const userDoc = await db.collection(USERS_COLLECTION).doc(user.uid).get();
-                        const userData = userDoc.data();
-
-                        const emergencyData = {
-                            userId: user.uid,
-                            userName: `${userData.firstName} ${userData.lastName}`,
-                            contactNumber: userData.contactNumber,
-                            groupId: userData.groupId,
-                            groupName: userData.groupName,
-                            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                            status: 'active',
-                            initialLocation: {
-                                lat: position.coords.latitude,
-                                lng: position.coords.longitude,
-                                accuracy: position.coords.accuracy
-                            },
-                            currentLocation: {
-                                lat: position.coords.latitude,
-                                lng: position.coords.longitude,
-                                accuracy: position.coords.accuracy,
-                                updateNumber: 1
-                            },
-                            locationUpdateCount: 1
-                        };
-
-                        const docRef = await db.collection(EMERGENCIES_COLLECTION).add(emergencyData);
-                        currentEmergencyId = docRef.id;
-
-                        await db.collection(LOCATION_HISTORY_COLLECTION).add({
-                            emergencyId: currentEmergencyId,
-                            userId: user.uid,
-                            sequence: 1,
-                            location: {
-                                lat: position.coords.latitude,
-                                lng: position.coords.longitude,
-                                accuracy: position.coords.accuracy
-                            },
-                            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                            clientTimestamp: new Date().toISOString()
-                        });
-
-                        isSOSActive = true;
-                        locationUpdateCount = 1;
-                        sosStartTime = new Date();
-                        lastLocationUpdate = new Date();
-                        lastLocationPosition = {
-                            lat: position.coords.latitude,
-                            lng: position.coords.longitude,
-                            accuracy: position.coords.accuracy
-                        };
-                        
-                        sosButton.classList.add('active');
-                        document.querySelector('.sos-instruction').innerHTML = '<span class="sos-engaged">ENGAGED</span><br><span class="sos-press-to-stop">PRESS TO STOP</span>';
-                        document.getElementById('locationCounter').classList.remove('hidden');
-                        document.getElementById('locationCounter').textContent = '1';
-                        document.getElementById('locationCount').textContent = '📍 Updates: 1';
-                        document.getElementById('lastUpdateTime').textContent = 
-                            `⏱️ Last: ${new Date().toLocaleTimeString()}`;
-                        statusDiv.innerHTML = '✅ SOS Active - Location tracking every 1 minute';
-                        locationNote.innerHTML = '📍 Location #1 shared';
-                        
-                        startTimer();
-                        startOneMinuteUpdates(currentEmergencyId);
-                        
-                    } catch (error) {
-                        if (error.code === 1) {
-                            // User denied location
-                            try {
-                                const user = auth.currentUser;
-                                if (!user) throw new Error('Not logged in');
-
-                                const userDoc = await db.collection(USERS_COLLECTION).doc(user.uid).get();
-                                const userData = userDoc.data();
-
-                                const emergencyData = {
-                                    userId: user.uid,
-                                    userName: `${userData.firstName} ${userData.lastName}`,
-                                    contactNumber: userData.contactNumber,
-                                    groupId: userData.groupId,
-                                    groupName: userData.groupName,
-                                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                                    status: 'active',
-                                    locationPermission: false
-                                };
-
-                                const docRef = await db.collection(EMERGENCIES_COLLECTION).add(emergencyData);
-                                currentEmergencyId = docRef.id;
-
-                                isSOSActive = true;
-                                sosStartTime = new Date();
-                                
-                                sosButton.classList.add('active');
-                                document.querySelector('.sos-instruction').innerHTML = '<span class="sos-engaged">ENGAGED</span><br><span class="sos-press-to-stop">PRESS TO STOP</span>';
-                                statusDiv.innerHTML = '✅ SOS Active - No location permission';
-                                locationNote.innerHTML = '📍 Location denied';
-                                document.getElementById('locationCounter').classList.remove('hidden');
-                                document.getElementById('locationCounter').textContent = '0';
-                                
-                                startTimer();
-                                
-                            } catch (firebaseError) {
-                                statusDiv.innerHTML = '❌ SOS Failed';
-                                statusDiv.className = 'status-message error';
-                                resetSOSButton();
-                            }
-                        } else {
-                            locationNote.innerHTML = '📍 Location unavailable';
-                            statusDiv.innerHTML = '❌ Location error';
-                            statusDiv.className = 'status-message error';
-                        }
-                    }
-                }
-            } finally {
-                setTimeout(() => {
-                    isProcessing = false;
-                }, 2000);
-            }
-        });
-
         // Handle page visibility changes
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible' && isSOSActive && currentEmergencyId) {
@@ -1240,7 +1500,7 @@
             Notification.requestPermission();
         }
 
-        // Force hide loading overlay after 3 seconds max (fallback)
+        // Force hide loading overlay after 3 seconds max
         setTimeout(() => {
             loadingOverlay.classList.add('hidden');
         }, 3000);
