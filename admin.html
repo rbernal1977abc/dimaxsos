@@ -2493,8 +2493,11 @@
             
             const activeClass = emergency.id === selectedEmergencyId ? 'active' : '';
             
+            // Escape the emergency object for onclick
+            const escapedEmergency = JSON.stringify(emergency).replace(/"/g, '&quot;');
+            
             return `
-                <div class="emergency-item ${emergency.status} ${activeClass}" data-id="${emergency.id}" onclick="selectEmergency(${JSON.stringify(emergency).replace(/"/g, '&quot;')})">
+                <div class="emergency-item ${emergency.status} ${activeClass}" data-id="${emergency.id}" onclick='selectEmergency(${JSON.stringify(emergency)})'>
                     <div class="emergency-header">
                         <span class="emergency-title">${emergency.userName}</span>
                         ${statusBadge} ${operatorInfo} ${durationText}
@@ -2587,11 +2590,20 @@
                     </div>
                 `;
                 
+                console.log('Loading history for emergency:', emergencyId);
+                
+                // Get the emergency document
                 const doc = await db.collection(EMERGENCIES_COLLECTION).doc(emergencyId).get();
-                if (!doc.exists) return;
+                if (!doc.exists) {
+                    console.error('Emergency not found:', emergencyId);
+                    infoDiv.innerHTML = '<h4>Emergency not found</h4>';
+                    return;
+                }
                 
                 const emergency = doc.data();
                 emergency.id = doc.id;
+                
+                console.log('Emergency data:', emergency);
                 
                 // Clear existing markers and route
                 for (let id in mapMarkers) {
@@ -2615,8 +2627,14 @@
                     .orderBy('sequence')
                     .get();
                 
+                console.log('Location history count:', historySnapshot.size);
+                
                 const locations = [];
-                historySnapshot.forEach(doc => locations.push(doc.data()));
+                historySnapshot.forEach(doc => {
+                    const data = doc.data();
+                    console.log('Location data:', data);
+                    locations.push(data);
+                });
                 
                 if (locations.length > 0) {
                     const waypoints = [];
@@ -2687,11 +2705,11 @@
                     showHistoryInfo(emergency, []);
                 } else {
                     // No locations
-                    infoDiv.innerHTML = '<h4>No location history available</h4>';
+                    infoDiv.innerHTML = '<h4>No location history available for this emergency</h4>';
                 }
             } catch (error) {
                 console.error('Error showing history:', error);
-                document.getElementById('selectedEmergencyInfo').innerHTML = '<h4>Error loading history</h4>';
+                document.getElementById('selectedEmergencyInfo').innerHTML = '<h4>Error loading history: ' + error.message + '</h4>';
             }
         }
 
