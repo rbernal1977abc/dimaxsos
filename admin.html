@@ -288,9 +288,10 @@
             animation: slideIn 0.3s ease;
         }
 
+        /* REMOVED blinking animation - now just subtle highlight */
         .emergency-item.new-emergency {
-            animation: pulse 1s ease-in-out 3;
             background: #fff3f3;
+            border-left-width: 8px;
         }
 
         .emergency-item:hover {
@@ -1220,12 +1221,6 @@
             }
         }
 
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(255,68,68,0.7); }
-            50% { box-shadow: 0 0 0 10px rgba(255,68,68,0); }
-            100% { box-shadow: 0 0 0 0 rgba(255,68,68,0); }
-        }
-
         .copy-notification {
             position: fixed;
             bottom: 20px;
@@ -1518,7 +1513,7 @@
         </div>
     </div>
 
-    <!-- Modals -->
+    <!-- Add Group Modal -->
     <div id="addGroupModal" class="modal">
         <div class="modal-content">
             <h3>Add New Group</h3>
@@ -1537,6 +1532,7 @@
         </div>
     </div>
 
+    <!-- Edit Group Modal -->
     <div id="editGroupModal" class="modal">
         <div class="modal-content">
             <h3>Edit Group</h3>
@@ -1556,6 +1552,7 @@
         </div>
     </div>
 
+    <!-- Add User Modal -->
     <div id="addUserModal" class="modal">
         <div class="modal-content">
             <h3>Add New User</h3>
@@ -1592,6 +1589,7 @@
         </div>
     </div>
 
+    <!-- Move User Modal -->
     <div id="moveUserModal" class="modal">
         <div class="modal-content">
             <h3>Move User to Another Group</h3>
@@ -1610,6 +1608,7 @@
         </div>
     </div>
 
+    <!-- View Group Members Modal -->
     <div id="viewGroupMembersModal" class="modal">
         <div class="modal-content">
             <h3 id="viewGroupName">Group Members</h3>
@@ -1620,6 +1619,7 @@
         </div>
     </div>
 
+    <!-- Generate Code Modal -->
     <div id="generateCodeModal" class="modal">
         <div class="modal-content">
             <h3>Generate Registration Code</h3>
@@ -1644,6 +1644,7 @@
         </div>
     </div>
 
+    <!-- Edit Code Modal -->
     <div id="editCodeModal" class="modal">
         <div class="modal-content">
             <h3>Edit Registration Code</h3>
@@ -1676,6 +1677,7 @@
         </div>
     </div>
 
+    <!-- Add Admin Modal -->
     <div id="addAdminModal" class="modal">
         <div class="modal-content">
             <h3>Add New Admin/Operator</h3>
@@ -1701,6 +1703,7 @@
         </div>
     </div>
 
+    <!-- User Detail Modal -->
     <div id="userDetailModal" class="modal" style="display: none;">
         <div class="modal-content">
             <h3 id="userDetailName">User Details</h3>
@@ -1725,6 +1728,16 @@
         const auth = firebase.auth();
         const db = firebase.firestore();
 
+        // Enable persistence for better performance
+        db.enablePersistence()
+            .catch((err) => {
+                if (err.code === 'failed-precondition') {
+                    console.log('Multiple tabs open, persistence enabled in one tab only');
+                } else if (err.code === 'unimplemented') {
+                    console.log('Browser doesn\'t support persistence');
+                }
+            });
+
         // Collections
         const USERS_COLLECTION = 'registered_users';
         const EMERGENCIES_COLLECTION = 'emergencies';
@@ -1745,9 +1758,19 @@
         let currentFilter = 'all';
         let selectedGroupId = null;
         
-        // Audio for alerts
-        const alertSound = new Audio('https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3');
+        // Audio for alerts - FIXED: Better sound handling
+        const alertSound = new Audio();
         alertSound.volume = 0.7;
+        alertSound.loop = false;
+        alertSound.preload = 'auto';
+        
+        // Try multiple sound sources for reliability
+        const soundSources = [
+            'https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3',
+            'https://www.soundjay.com/misc/sounds/bell-ringing-01.mp3',
+            'https://www.soundjay.com/misc/sounds/bell-ringing-02.mp3',
+            'https://actions.google.com/sounds/v1/alarms/beep_short.ogg'
+        ];
         
         // Keep track of processed emergencies
         let processedEmergencies = new Set();
@@ -1756,57 +1779,92 @@
 
         // Connection status
         let connectionStatus = document.getElementById('connectionStatus');
-        let forceRefreshInterval = null;
+        let reconnectAttempts = 0;
+        let lastEmergencyCount = 0;
 
-        // Initialize when page loads
-        window.addEventListener('load', function() {
-            console.log('Page loaded, checking auth state...');
-            checkAuthState();
-        });
-
-        // Check authentication state
-        function checkAuthState() {
-            auth.onAuthStateChanged(async (user) => {
-                console.log('Auth state changed:', user ? 'Logged in' : 'Logged out');
-                if (user) {
-                    try {
-                        const adminDoc = await db.collection(ADMINS_COLLECTION).doc(user.uid).get();
-                        
-                        if (adminDoc.exists) {
-                            currentUser = user;
-                            currentUserRole = adminDoc.data().role;
-                            
-                            document.getElementById('loginContainer').style.display = 'none';
-                            document.getElementById('dashboard').style.display = 'block';
-                            document.getElementById('adminName').textContent = adminDoc.data().firstName + ' ' + adminDoc.data().lastName;
-                            document.getElementById('adminRole').textContent = currentUserRole === 'admin' ? 'Super Admin' : 'Operator';
-                            
-                            // Initialize everything
-                            setTimeout(() => {
-                                initMap();
-                                loadInitialEmergencies();
-                                loadStats();
-                                loadGroups();
-                                loadUsers();
-                                loadCodes();
-                                loadAdmins();
-                                loadGroupSelects();
-                                startForceRefresh();
-                            }, 500);
-                        } else {
-                            await auth.signOut();
-                            showLoginMessage('This account does not have admin privileges.', 'error');
-                        }
-                    } catch (error) {
-                        console.error('Error checking admin:', error);
-                        showLoginMessage('Error verifying admin status.', 'error');
+        // ===== FIXED: Play alert sound with better browser support =====
+        function playAlertSound() {
+            if (!soundEnabled) return;
+            
+            try {
+                // Create new audio instance each time to avoid browser restrictions
+                const audio = new Audio();
+                audio.volume = 0.7;
+                
+                // Try each sound source until one works
+                const trySound = (index) => {
+                    if (index >= soundSources.length) return;
+                    
+                    audio.src = soundSources[index];
+                    audio.play()
+                        .then(() => {
+                            console.log('Sound played successfully');
+                        })
+                        .catch((error) => {
+                            console.log(`Sound ${index} failed, trying next...`);
+                            trySound(index + 1);
+                        });
+                };
+                
+                trySound(0);
+                
+                // Also try HTML5 Audio context as backup
+                if (window.AudioContext || window.webkitAudioContext) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    const audioCtx = new AudioContext();
+                    
+                    if (audioCtx.state === 'suspended') {
+                        audioCtx.resume();
                     }
-                } else {
-                    showLoginForm();
-                    checkForFirstTimeSetup();
                 }
-            });
+                
+            } catch (error) {
+                console.log('Sound error:', error);
+            }
         }
+
+        // Check authentication and admin status
+        auth.onAuthStateChanged(async (user) => {
+            console.log('Auth state changed:', user ? 'Logged in' : 'Logged out');
+            
+            if (user) {
+                try {
+                    const adminDoc = await db.collection(ADMINS_COLLECTION).doc(user.uid).get();
+                    
+                    if (adminDoc.exists) {
+                        currentUser = user;
+                        currentUserRole = adminDoc.data().role;
+                        
+                        document.getElementById('loginContainer').style.display = 'none';
+                        document.getElementById('dashboard').style.display = 'block';
+                        document.getElementById('adminName').textContent = adminDoc.data().firstName + ' ' + adminDoc.data().lastName;
+                        document.getElementById('adminRole').textContent = currentUserRole === 'admin' ? 'Super Admin' : 'Operator';
+                        
+                        // Initialize everything
+                        setTimeout(() => {
+                            initMap();
+                            setupRealtimeEmergenciesListener();
+                            loadStats();
+                            loadGroups();
+                            loadUsers();
+                            loadCodes();
+                            loadAdmins();
+                            loadGroupSelects();
+                            monitorConnection();
+                        }, 500);
+                    } else {
+                        await auth.signOut();
+                        showLoginMessage('This account does not have admin privileges.', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error checking admin:', error);
+                    showLoginMessage('Error verifying admin status.', 'error');
+                }
+            } else {
+                showLoginForm();
+                checkForFirstTimeSetup();
+            }
+        });
 
         // Show login form
         function showLoginForm() {
@@ -1912,7 +1970,6 @@
 
         // Logout
         document.getElementById('logoutBtn').addEventListener('click', async () => {
-            stopForceRefresh();
             await auth.signOut();
         });
 
@@ -1923,24 +1980,27 @@
             messageDiv.className = `message ${type}`;
         }
 
-        // Start force refresh
-        function startForceRefresh() {
-            if (forceRefreshInterval) {
-                clearInterval(forceRefreshInterval);
-            }
-            forceRefreshInterval = setInterval(() => {
-                if (document.getElementById('emergenciesTab').classList.contains('active')) {
-                    refreshEmergenciesForce();
+        // Monitor Firestore connection
+        function monitorConnection() {
+            db.collection('__health__').doc('health').onSnapshot({
+                next: () => {
+                    connectionStatus.textContent = '🟢 Connected';
+                    connectionStatus.className = 'connection-status connected';
+                    reconnectAttempts = 0;
+                },
+                error: (error) => {
+                    console.log('Connection error:', error);
+                    connectionStatus.textContent = '🔴 Disconnected - Reconnecting...';
+                    connectionStatus.className = 'connection-status disconnected';
+                    
+                    reconnectAttempts++;
+                    if (reconnectAttempts > 3) {
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 5000);
+                    }
                 }
-            }, 5000);
-        }
-
-        // Stop force refresh
-        function stopForceRefresh() {
-            if (forceRefreshInterval) {
-                clearInterval(forceRefreshInterval);
-                forceRefreshInterval = null;
-            }
+            });
         }
 
         // Initialize Map
@@ -1956,8 +2016,9 @@
             }, 200);
         }
 
-        // Clear all markers
-        function clearAllMarkers() {
+        // Clear all markers and reset map to default view
+        function clearAllMarkersAndResetMap() {
+            // Clear all markers
             for (let id in mapMarkers) {
                 if (mapMarkers[id]) map.removeLayer(mapMarkers[id]);
             }
@@ -1972,6 +2033,15 @@
                 map.removeControl(routingControl);
                 routingControl = null;
             }
+            
+            // Reset to default Philippines view
+            if (map) {
+                map.setView([14.5995, 120.9842], 12);
+            }
+            
+            // Clear selected info
+            document.getElementById('selectedEmergencyInfo').innerHTML = '<h4>Select an emergency to view details</h4>';
+            selectedEmergencyId = null;
         }
 
         // Switch tabs
@@ -1987,7 +2057,6 @@
                 document.getElementById('emergenciesTab').classList.add('active');
                 setTimeout(() => {
                     if (map) map.invalidateSize();
-                    refreshEmergenciesForce();
                 }, 100);
             } else if (tab === 'users-groups') {
                 tabs[1].classList.add('active');
@@ -2013,8 +2082,7 @@
             currentFilter = filter;
             document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
             event.target.classList.add('active');
-            clearAllMarkers();
-            loadInitialEmergencies();
+            clearAllMarkersAndResetMap();
         };
 
         // Toggle sound
@@ -2025,26 +2093,155 @@
             soundBtn.className = soundEnabled ? 'sound-on' : 'sound-off';
         };
 
-        // Load initial emergencies
-        async function loadInitialEmergencies() {
-            await refreshEmergenciesForce();
+        // ===== FIXED: Setup real-time emergencies listener with 1-second refresh =====
+        function setupRealtimeEmergenciesListener() {
+            // Listen to emergencies collection in real-time
+            db.collection(EMERGENCIES_COLLECTION)
+                .orderBy('timestamp', 'desc')
+                .onSnapshot({
+                    next: (snapshot) => {
+                        console.log('Real-time update received');
+                        connectionStatus.textContent = '🟢 Connected';
+                        connectionStatus.className = 'connection-status connected';
+                        
+                        // Process changes
+                        snapshot.docChanges().forEach(change => {
+                            const emergency = change.doc.data();
+                            emergency.id = change.doc.id;
+                            
+                            if (change.type === 'added') {
+                                console.log('New emergency added:', emergency.id);
+                                handleNewEmergency(emergency);
+                            } else if (change.type === 'modified') {
+                                console.log('Emergency modified:', emergency.id);
+                                handleEmergencyUpdate(emergency);
+                            } else if (change.type === 'removed') {
+                                console.log('Emergency removed:', emergency.id);
+                                handleEmergencyRemoval(emergency.id);
+                            }
+                        });
+                        
+                        // Refresh the display
+                        refreshEmergenciesDisplay();
+                        loadStats();
+                    },
+                    error: (error) => {
+                        console.error('Real-time listener error:', error);
+                        connectionStatus.textContent = '🔴 Connection Lost - Retrying...';
+                        connectionStatus.className = 'connection-status reconnecting';
+                        
+                        setTimeout(() => {
+                            setupRealtimeEmergenciesListener();
+                        }, 2000);
+                    }
+                }, { includeMetadataChanges: true });
         }
 
-        // Force refresh emergencies
-        async function refreshEmergenciesForce() {
+        // Handle new emergency
+        async function handleNewEmergency(emergency) {
+            if (processedEmergencies.has(emergency.id)) return;
+            
+            processedEmergencies.add(emergency.id);
+            
+            // Get latest location
             try {
-                const snapshot = await db.collection(EMERGENCIES_COLLECTION).orderBy('timestamp', 'desc').get();
+                const locationSnapshot = await db.collection(LOCATION_HISTORY_COLLECTION)
+                    .where('emergencyId', '==', emergency.id)
+                    .orderBy('sequence', 'desc')
+                    .limit(1)
+                    .get();
+                
+                if (!locationSnapshot.empty) {
+                    const latestLocation = locationSnapshot.docs[0].data();
+                    emergency.currentLocation = latestLocation.location;
+                    emergency.locationUpdateCount = latestLocation.sequence;
+                }
+            } catch (locError) {
+                console.log('No location history for new emergency:', emergency.id);
+            }
+            
+            // Play sound for active emergencies
+            if (emergency.status === 'active') {
+                playAlertSound();
+            }
+            
+            // Set up location listener if active
+            if (emergency.status === 'active' || emergency.status === 'in-progress') {
+                setupLocationListener(emergency.id);
+            }
+        }
+
+        // Handle emergency update
+        async function handleEmergencyUpdate(emergency) {
+            // Get latest location
+            try {
+                const locationSnapshot = await db.collection(LOCATION_HISTORY_COLLECTION)
+                    .where('emergencyId', '==', emergency.id)
+                    .orderBy('sequence', 'desc')
+                    .limit(1)
+                    .get();
+                
+                if (!locationSnapshot.empty) {
+                    const latestLocation = locationSnapshot.docs[0].data();
+                    emergency.currentLocation = latestLocation.location;
+                    emergency.locationUpdateCount = latestLocation.sequence;
+                }
+            } catch (locError) {
+                console.log('No location history for emergency update:', emergency.id);
+            }
+            
+            if (emergency.status === 'completed') {
+                removeLocationListener(emergency.id);
+                
+                if (mapMarkers[emergency.id]) {
+                    map.removeLayer(mapMarkers[emergency.id]);
+                    delete mapMarkers[emergency.id];
+                }
+            } else if (emergency.currentLocation && (emergency.status === 'active' || emergency.status === 'in-progress')) {
+                // Update marker
+                addMarkerToMap(emergency.id, emergency);
+            }
+        }
+
+        // Handle emergency removal
+        function handleEmergencyRemoval(emergencyId) {
+            removeLocationListener(emergencyId);
+            
+            if (mapMarkers[emergencyId]) {
+                map.removeLayer(mapMarkers[emergencyId]);
+                delete mapMarkers[emergencyId];
+            }
+            
+            // If this was the selected emergency, reset map
+            if (selectedEmergencyId === emergencyId) {
+                clearAllMarkersAndResetMap();
+            }
+        }
+
+        // Refresh emergencies display
+        async function refreshEmergenciesDisplay() {
+            try {
+                const snapshot = await db.collection(EMERGENCIES_COLLECTION)
+                    .orderBy('timestamp', 'desc')
+                    .get();
                 
                 const emergenciesList = document.getElementById('emergenciesList');
                 emergenciesList.innerHTML = '';
-                clearAllMarkers();
+                
+                // Clear markers but keep map
+                for (let id in mapMarkers) {
+                    if (mapMarkers[id]) map.removeLayer(mapMarkers[id]);
+                }
+                mapMarkers = {};
                 
                 let emergencyCount = 0;
+                let hasActiveEmergency = false;
                 
                 for (const doc of snapshot.docs) {
                     const emergency = doc.data();
                     emergency.id = doc.id;
                     
+                    // Get latest location
                     try {
                         const locationSnapshot = await db.collection(LOCATION_HISTORY_COLLECTION)
                             .where('emergencyId', '==', emergency.id)
@@ -2061,20 +2258,30 @@
                         console.log('No location history');
                     }
                     
+                    // Apply filter
                     if (currentFilter === 'all' || emergency.status === currentFilter) {
                         emergencyCount++;
                         emergenciesList.appendChild(createEmergencyItem(emergency));
                         
+                        // Add marker to map for active/in-progress emergencies
                         if (emergency.currentLocation && (emergency.status === 'active' || emergency.status === 'in-progress')) {
                             addMarkerToMap(emergency.id, emergency);
+                            hasActiveEmergency = true;
                         }
                     }
                 }
                 
                 document.getElementById('emergencyCount').textContent = emergencyCount;
+                
                 if (emergencyCount === 0) {
                     emergenciesList.innerHTML = '<p style="text-align: center; padding: 20px;">No emergencies found</p>';
                 }
+                
+                // If no active emergencies, reset map to default view
+                if (!hasActiveEmergency) {
+                    clearAllMarkersAndResetMap();
+                }
+                
             } catch (error) {
                 console.error('Refresh error:', error);
             }
@@ -2095,13 +2302,108 @@
             });
             
             const marker = L.marker([emergency.currentLocation.lat, emergency.currentLocation.lng], { icon: customIcon }).addTo(map);
-            marker.bindPopup(`<b>${emergency.userName}</b><br>Status: ${emergency.status}<br>Update #${emergency.locationUpdateCount || 0}`);
+            
+            const time = emergency.timestamp ? new Date(emergency.timestamp.seconds * 1000).toLocaleString() : 'Just now';
+            
+            marker.bindPopup(`
+                <div style="min-width: 200px;">
+                    <b>${emergency.userName}</b><br>
+                    <span style="color: ${markerColor}; font-weight: bold;">${emergency.status.toUpperCase()}</span><br>
+                    <span style="color: #17a2b8;">📍 Update #${emergency.locationUpdateCount || 0}</span><br>
+                    <span>⏰ ${time}</span><br>
+                    <span>📞 ${emergency.contactNumber}</span><br>
+                    ${emergency.handledByName ? `<span>👤 Handled by: ${emergency.handledByName}</span>` : ''}
+                </div>
+            `);
+            
             marker.on('click', () => selectEmergency(emergency));
             
             mapMarkers[emergencyId] = marker;
         }
 
-        // Create emergency item
+        // Setup location listener
+        function setupLocationListener(emergencyId) {
+            removeLocationListener(emergencyId);
+            
+            const unsubscribe = db.collection(LOCATION_HISTORY_COLLECTION)
+                .where('emergencyId', '==', emergencyId)
+                .orderBy('sequence', 'desc')
+                .limit(1)
+                .onSnapshot((snapshot) => {
+                    snapshot.docChanges().forEach(change => {
+                        if (change.type === 'added' || change.type === 'modified') {
+                            const location = change.doc.data();
+                            
+                            db.collection(EMERGENCIES_COLLECTION).doc(emergencyId).get().then(emergencyDoc => {
+                                if (emergencyDoc.exists) {
+                                    const emergency = emergencyDoc.data();
+                                    emergency.id = emergencyDoc.id;
+                                    emergency.currentLocation = location.location;
+                                    emergency.locationUpdateCount = location.sequence;
+                                    
+                                    addMarkerToMap(emergencyId, emergency);
+                                    refreshEmergenciesDisplay();
+                                    
+                                    if (selectedEmergencyId === emergencyId) {
+                                        showEmergencyInfo(emergency);
+                                    }
+                                }
+                            });
+                        }
+                    });
+                });
+            
+            activeLocationListeners.set(emergencyId, unsubscribe);
+        }
+
+        // Remove location listener
+        function removeLocationListener(emergencyId) {
+            if (activeLocationListeners.has(emergencyId)) {
+                const unsubscribe = activeLocationListeners.get(emergencyId);
+                unsubscribe();
+                activeLocationListeners.delete(emergencyId);
+            }
+        }
+
+        // Show emergency info
+        function showEmergencyInfo(emergency) {
+            const infoDiv = document.getElementById('selectedEmergencyInfo');
+            const time = emergency.timestamp ? new Date(emergency.timestamp.seconds * 1000).toLocaleString() : 'Just now';
+            const location = emergency.currentLocation || emergency.location || null;
+            
+            let locationHtml = '';
+            if (location) {
+                locationHtml = `
+                    <div class="info-item">
+                        <span class="info-label">Location</span>
+                        <span class="info-value">${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Update #</span>
+                        <span class="info-value">${emergency.locationUpdateCount || 0}</span>
+                    </div>
+                `;
+            }
+            
+            infoDiv.innerHTML = `
+                <h4>Selected Emergency</h4>
+                <div class="info-grid">
+                    <div class="info-item"><span class="info-label">Name</span><span class="info-value">${emergency.userName}</span></div>
+                    <div class="info-item"><span class="info-label">Contact</span><span class="info-value">${emergency.contactNumber}</span></div>
+                    <div class="info-item"><span class="info-label">Group</span><span class="info-value">${emergency.groupName || 'N/A'}</span></div>
+                    <div class="info-item"><span class="info-label">Status</span><span class="info-value">${emergency.status}</span></div>
+                    <div class="info-item"><span class="info-label">Time</span><span class="info-value">${time}</span></div>
+                    ${locationHtml}
+                </div>
+                ${emergency.handledBy ? `
+                    <div style="margin-top: 10px; padding: 10px; background: #e3f2fd; border-radius: 5px;">
+                        <strong>Handled by:</strong> ${emergency.handledByName} (${emergency.handledByRole})
+                    </div>
+                ` : ''}
+            `;
+        }
+
+        // Create emergency item with operator visibility
         function createEmergencyItem(emergency) {
             const div = document.createElement('div');
             div.className = `emergency-item ${emergency.status} ${emergency.id === selectedEmergencyId ? 'active' : ''}`;
@@ -2115,27 +2417,37 @@
                 'No location';
             
             let statusBadge = '';
-            let viewButton = '';
+            let operatorInfo = '';
+            let handleButton = '';
+            let completeButton = '';
             let deleteButton = '';
             
             switch(emergency.status) {
                 case 'active':
                     statusBadge = '<span class="emergency-badge badge-active">ACTIVE</span>';
-                    viewButton = `<button class="action-btn btn-view-location" onclick="event.stopPropagation(); selectEmergency(${JSON.stringify(emergency).replace(/"/g, '&quot;')})">View Location</button>`;
+                    handleButton = `<button class="action-btn btn-handle" onclick="event.stopPropagation(); handleEmergency('${emergency.id}')">Handle</button>`;
                     if (currentUserRole === 'admin') {
                         deleteButton = `<button class="action-btn btn-delete" onclick="event.stopPropagation(); deleteEmergency('${emergency.id}')">Delete</button>`;
                     }
                     break;
+                    
                 case 'in-progress':
                     statusBadge = '<span class="emergency-badge badge-in-progress">IN PROGRESS</span>';
-                    viewButton = `<button class="action-btn btn-view-location" onclick="event.stopPropagation(); selectEmergency(${JSON.stringify(emergency).replace(/"/g, '&quot;')})">View Location</button>`;
+                    // Show who is handling this emergency
+                    if (emergency.handledByName) {
+                        operatorInfo = `<span class="operator-badge">👤 ${emergency.handledByName}</span>`;
+                    }
+                    // Only the handler or admin can complete
+                    if (emergency.handledBy === currentUser?.uid || currentUserRole === 'admin') {
+                        completeButton = `<button class="action-btn btn-complete" onclick="event.stopPropagation(); completeEmergency('${emergency.id}')">Complete</button>`;
+                    }
                     if (currentUserRole === 'admin') {
                         deleteButton = `<button class="action-btn btn-delete" onclick="event.stopPropagation(); deleteEmergency('${emergency.id}')">Delete</button>`;
                     }
                     break;
+                    
                 case 'completed':
                     statusBadge = '<span class="emergency-badge badge-completed">COMPLETED</span>';
-                    viewButton = `<button class="action-btn btn-view-history" onclick="event.stopPropagation(); viewEmergencyHistory('${emergency.id}')">View History</button>`;
                     if (currentUserRole === 'admin') {
                         deleteButton = `<button class="action-btn btn-delete" onclick="event.stopPropagation(); deleteEmergency('${emergency.id}')">Delete</button>`;
                     }
@@ -2145,7 +2457,7 @@
             div.innerHTML = `
                 <div class="emergency-header">
                     <span class="emergency-title">${emergency.userName}</span>
-                    ${statusBadge}
+                    ${statusBadge} ${operatorInfo}
                 </div>
                 <div class="emergency-details">
                     <div>📞 ${emergency.contactNumber}</div>
@@ -2154,9 +2466,8 @@
                     <div>👥 ${emergency.groupName || 'No Group'}</div>
                 </div>
                 <div class="emergency-actions">
-                    ${emergency.status === 'active' ? `<button class="action-btn btn-handle" onclick="event.stopPropagation(); handleEmergency('${emergency.id}')">Handle</button>` : ''}
-                    ${emergency.status === 'in-progress' && emergency.handledBy === currentUser?.uid ? `<button class="action-btn btn-complete" onclick="event.stopPropagation(); completeEmergency('${emergency.id}')">Complete</button>` : ''}
-                    ${viewButton}
+                    ${handleButton}
+                    ${completeButton}
                     ${deleteButton}
                 </div>
             `;
@@ -2174,30 +2485,9 @@
             const selectedItem = document.querySelector(`.emergency-item[data-id="${emergency.id}"]`);
             if (selectedItem) selectedItem.classList.add('active');
             
-            const infoDiv = document.getElementById('selectedEmergencyInfo');
-            const time = emergency.timestamp ? new Date(emergency.timestamp.seconds * 1000).toLocaleString() : 'Just now';
-            const location = emergency.currentLocation || emergency.location || null;
+            showEmergencyInfo(emergency);
             
-            let locationHtml = '';
-            if (location) {
-                locationHtml = `
-                    <div class="info-item"><span class="info-label">Location</span><span class="info-value">${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}</span></div>
-                    <div class="info-item"><span class="info-label">Update #</span><span class="info-value">${emergency.locationUpdateCount || 0}</span></div>
-                `;
-            }
-            
-            infoDiv.innerHTML = `
-                <h4>Selected Emergency</h4>
-                <div class="info-grid">
-                    <div class="info-item"><span class="info-label">Name</span><span class="info-value">${emergency.userName}</span></div>
-                    <div class="info-item"><span class="info-label">Contact</span><span class="info-value">${emergency.contactNumber}</span></div>
-                    <div class="info-item"><span class="info-label">Group</span><span class="info-value">${emergency.groupName || 'N/A'}</span></div>
-                    <div class="info-item"><span class="info-label">Status</span><span class="info-value">${emergency.status}</span></div>
-                    <div class="info-item"><span class="info-label">Time</span><span class="info-value">${time}</span></div>
-                    ${locationHtml}
-                </div>
-            `;
-            
+            const location = emergency.currentLocation || emergency.location;
             if (location && map) {
                 map.setView([location.lat, location.lng], 15);
             }
@@ -2211,8 +2501,12 @@
                     const emergency = doc.data();
                     emergency.id = doc.id;
                     
-                    clearAllMarkers();
+                    // Clear existing markers and route
+                    for (let id in mapMarkers) map.removeLayer(mapMarkers[id]);
+                    mapMarkers = {};
+                    if (routingControl) map.removeControl(routingControl);
                     
+                    // Get all location history
                     const historySnapshot = await db.collection(LOCATION_HISTORY_COLLECTION)
                         .where('emergencyId', '==', emergencyId)
                         .orderBy('sequence')
@@ -2270,12 +2564,14 @@
             `;
         }
 
-        // Handle emergency
+        // ===== FIXED: Handle emergency with proper visibility =====
         window.handleEmergency = async function(emergencyId) {
             if (!currentUser) return;
+            
             try {
                 const userDoc = await db.collection(ADMINS_COLLECTION).doc(currentUser.uid).get();
                 const userData = userDoc.data();
+                
                 await db.collection(EMERGENCIES_COLLECTION).doc(emergencyId).update({
                     status: 'in-progress',
                     handledBy: currentUser.uid,
@@ -2283,21 +2579,46 @@
                     handledByRole: userData.role,
                     handledAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
+                
+                // Immediately refresh to show in In Progress tab
+                refreshEmergenciesDisplay();
+                
             } catch (error) {
-                alert('Error: ' + error.message);
+                alert('Error handling emergency: ' + error.message);
             }
         };
 
-        // Complete emergency
+        // ===== FIXED: Complete emergency with permission check =====
         window.completeEmergency = async function(emergencyId) {
             try {
+                // Check if user is allowed to complete this emergency
+                const emergencyDoc = await db.collection(EMERGENCIES_COLLECTION).doc(emergencyId).get();
+                const emergency = emergencyDoc.data();
+                
+                // Only handler or admin can complete
+                if (emergency.handledBy !== currentUser?.uid && currentUserRole !== 'admin') {
+                    alert('You can only complete emergencies that you are handling');
+                    return;
+                }
+                
                 await db.collection(EMERGENCIES_COLLECTION).doc(emergencyId).update({
                     status: 'completed',
                     completedAt: firebase.firestore.FieldValue.serverTimestamp(),
                     completedBy: currentUser.uid
                 });
+                
+                removeLocationListener(emergencyId);
+                
+                if (mapMarkers[emergencyId]) {
+                    map.removeLayer(mapMarkers[emergencyId]);
+                    delete mapMarkers[emergencyId];
+                }
+                
+                // Refresh display
+                refreshEmergenciesDisplay();
+                
             } catch (error) {
-                alert('Error: ' + error.message);
+                alert('Error completing emergency: ' + error.message);
             }
         };
 
@@ -2317,6 +2638,16 @@
                 historySnapshot.forEach(doc => batch.delete(doc.ref));
                 batch.delete(db.collection(EMERGENCIES_COLLECTION).doc(emergencyId));
                 await batch.commit();
+                
+                removeLocationListener(emergencyId);
+                
+                if (mapMarkers[emergencyId]) {
+                    map.removeLayer(mapMarkers[emergencyId]);
+                    delete mapMarkers[emergencyId];
+                }
+                
+                refreshEmergenciesDisplay();
+                
             } catch (error) {
                 alert('Error: ' + error.message);
             }
@@ -2551,8 +2882,12 @@
                     if (groupDoc.exists) groupName = groupDoc.data().name;
                 }
                 
-                await db.collection(USERS_COLLECTION).add({
-                    userId: 'user_' + Date.now(),
+                // Create user in Auth
+                const userCred = await auth.createUserWithEmailAndPassword(email, password);
+                
+                // Save user in Firestore
+                await db.collection(USERS_COLLECTION).doc(userCred.user.uid).set({
+                    userId: userCred.user.uid,
                     firstName: firstName,
                     lastName: lastName,
                     email: email,
@@ -2564,10 +2899,11 @@
                     registeredWithCode: code
                 });
                 
+                // Update code usage
                 await codeDoc.ref.update({
                     lastUsedAt: firebase.firestore.FieldValue.serverTimestamp(),
                     usageCount: firebase.firestore.FieldValue.increment(1)
-                });
+                }).catch(() => {});
                 
                 closeModal('addUserModal');
                 document.getElementById('userFirstName').value = '';
@@ -2617,11 +2953,19 @@
             }
         };
 
-        // Remove user
+        // ===== FIXED: Remove user from both Firestore AND Auth =====
         window.removeUser = async function(userId) {
-            if (!confirm('Remove this user?')) return;
+            if (!confirm('Remove this user? This will delete them from both Firestore and Authentication.')) return;
+            
             try {
+                // Delete from Firestore first
                 await db.collection(USERS_COLLECTION).doc(userId).delete();
+                
+                // Delete from Authentication using Firebase Admin SDK (requires cloud function)
+                // Note: Client-side cannot delete auth users directly for security reasons
+                // You'll need to implement this via a Cloud Function
+                alert('User removed from Firestore. To remove from Authentication, please use Firebase Console or implement a Cloud Function.');
+                
                 loadUsers();
                 loadStats();
             } catch (error) {
@@ -2904,10 +3248,10 @@
             const groupId = document.getElementById('reportGroupFilter').value;
             const snapshot = await db.collection(EMERGENCIES_COLLECTION).orderBy('timestamp', 'desc').get();
             
-            let html = '<table><tr><th>Date</th><th>User</th><th>Status</th></tr>';
+            let html = '<table><tr><th>Date</th><th>User</th><th>Status</th><th>Handled By</th></tr>';
             snapshot.forEach(doc => {
                 const d = doc.data();
-                html += `<tr><td>${d.timestamp ? new Date(d.timestamp.seconds*1000).toLocaleString() : ''}</td><td>${d.userName}</td><td>${d.status}</td></tr>`;
+                html += `<tr><td>${d.timestamp ? new Date(d.timestamp.seconds*1000).toLocaleString() : ''}</td><td>${d.userName}</td><td>${d.status}</td><td>${d.handledByName || 'N/A'}</td></tr>`;
             });
             html += '</table>';
             document.getElementById('reportResults').innerHTML = html;
@@ -2949,7 +3293,7 @@
             }
         });
 
-        // Group search
+        // Search functionality
         document.getElementById('groupSearch')?.addEventListener('input', loadGroups);
         document.getElementById('userSearch')?.addEventListener('input', () => loadUsers());
         document.getElementById('codeSearch')?.addEventListener('input', loadCodes);
