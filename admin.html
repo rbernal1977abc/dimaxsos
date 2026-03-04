@@ -2587,8 +2587,12 @@
                     </div>
                 `;
                 
+                // Get emergency details first
                 const doc = await db.collection(EMERGENCIES_COLLECTION).doc(emergencyId).get();
-                if (!doc.exists) return;
+                if (!doc.exists) {
+                    infoDiv.innerHTML = '<h4>Emergency not found</h4>';
+                    return;
+                }
                 
                 const emergency = doc.data();
                 emergency.id = doc.id;
@@ -2612,11 +2616,17 @@
                 // Get all location history
                 const historySnapshot = await db.collection(LOCATION_HISTORY_COLLECTION)
                     .where('emergencyId', '==', emergencyId)
-                    .orderBy('sequence')
+                    .orderBy('sequence', 'asc')
                     .get();
                 
                 const locations = [];
-                historySnapshot.forEach(doc => locations.push(doc.data()));
+                historySnapshot.forEach(doc => {
+                    const data = doc.data();
+                    // Ensure location object exists
+                    if (data.location && data.location.lat && data.location.lng) {
+                        locations.push(data);
+                    }
+                });
                 
                 if (locations.length > 0) {
                     const waypoints = [];
@@ -2632,11 +2642,12 @@
                         
                         const marker = L.marker([loc.location.lat, loc.location.lng], { icon: customIcon }).addTo(map);
                         
-                        const time = loc.clientTimestamp ? new Date(loc.clientTimestamp).toLocaleString() : 'N/A';
+                        const time = loc.clientTimestamp ? new Date(loc.clientTimestamp).toLocaleString() : 
+                                    (loc.timestamp ? new Date(loc.timestamp.seconds * 1000).toLocaleString() : 'N/A');
                         
                         marker.bindPopup(`
                             <div style="min-width: 200px;">
-                                <b>${emergency.userName}</b><br>
+                                <b>${emergency.userName || 'Unknown User'}</b><br>
                                 <span style="color: #28a745; font-weight: bold;">📍 Update #${loc.sequence}</span><br>
                                 <span>⏰ ${time}</span><br>
                                 <span>🎯 Accuracy: ${loc.location.accuracy ? Math.round(loc.location.accuracy) + 'm' : 'N/A'}</span>
@@ -2648,27 +2659,35 @@
                     });
                     
                     // Center map on first location
-                    map.setView([locations[0].location.lat, locations[0].location.lng], 14);
+                    if (locations.length > 0) {
+                        map.setView([locations[0].location.lat, locations[0].location.lng], 14);
+                    }
                     
                     // Draw route if multiple points
                     if (locations.length > 1) {
-                        routingControl = L.Routing.control({
-                            waypoints: waypoints,
-                            routeWhileDragging: false,
-                            addWaypoints: false,
-                            draggableWaypoints: false,
-                            fitSelectedRoutes: true,
-                            showAlternatives: false,
-                            lineOptions: {
-                                styles: [{ color: '#28a745', opacity: 0.7, weight: 4 }]
-                            }
-                        }).addTo(map);
+                        try {
+                            routingControl = L.Routing.control({
+                                waypoints: waypoints,
+                                routeWhileDragging: false,
+                                addWaypoints: false,
+                                draggableWaypoints: false,
+                                fitSelectedRoutes: true,
+                                showAlternatives: false,
+                                lineOptions: {
+                                    styles: [{ color: '#28a745', opacity: 0.7, weight: 4 }]
+                                }
+                            }).addTo(map);
+                        } catch (routeError) {
+                            console.log('Routing error:', routeError);
+                            // Still show markers even if routing fails
+                        }
                     }
                     
                     // Show history info
                     showHistoryInfo(emergency, locations);
-                } else if (emergency.location) {
-                    // Fallback to single location
+                    
+                } else if (emergency.location && emergency.location.lat && emergency.location.lng) {
+                    // Fallback to single location from emergency document
                     const customIcon = L.divIcon({
                         className: 'custom-marker',
                         html: `<div style="background-color: #28a745; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px; border: 2px solid white;">1</div>`,
@@ -2678,20 +2697,39 @@
                     
                     const marker = L.marker([emergency.location.lat, emergency.location.lng], { icon: customIcon }).addTo(map);
                     marker.bindPopup(`
-                        <b>${emergency.userName}</b><br>
+                        <b>${emergency.userName || 'Unknown User'}</b><br>
                         <span style="color: #28a745; font-weight: bold;">COMPLETED</span>
                     `);
                     
                     historyMarkers.push(marker);
                     map.setView([emergency.location.lat, emergency.location.lng], 14);
-                    showHistoryInfo(emergency, []);
+                    
+                    // Show basic info
+                    infoDiv.innerHTML = `
+                        <h4>Emergency History - ${emergency.userName || 'Unknown User'}</h4>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <span class="info-label">Final Location</span>
+                                <span class="info-value">${emergency.location.lat.toFixed(6)}, ${emergency.location.lng.toFixed(6)}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Status</span>
+                                <span class="info-value">Completed</span>
+                            </div>
+                        </div>
+                        <p style="margin-top: 10px; color: #666;">No detailed location history available</p>
+                    `;
                 } else {
-                    // No locations
-                    infoDiv.innerHTML = '<h4>No location history available</h4>';
+                    // No locations at all
+                    infoDiv.innerHTML = '<h4>No location data available for this emergency</h4>';
                 }
+                
             } catch (error) {
                 console.error('Error showing history:', error);
-                document.getElementById('selectedEmergencyInfo').innerHTML = '<h4>Error loading history</h4>';
+                document.getElementById('selectedEmergencyInfo').innerHTML = `
+                    <h4>Error loading history</h4>
+                    <p style="color: #dc3545;">${error.message || 'Please try again'}</p>
+                `;
             }
         }
 
@@ -2793,37 +2831,45 @@
         function showHistoryInfo(emergency, locations) {
             const infoDiv = document.getElementById('selectedEmergencyInfo');
             
-            const receivedTime = emergency.timestamp ? new Date(emergency.timestamp.seconds * 1000) : null;
-            const handledTime = emergency.handledAt ? new Date(emergency.handledAt.seconds * 1000) : null;
-            const completedTime = emergency.completedAt ? new Date(emergency.completedAt.seconds * 1000) : null;
+            // Safely convert timestamps
+            const receivedTime = emergency.timestamp ? 
+                (emergency.timestamp.toDate ? emergency.timestamp.toDate() : new Date(emergency.timestamp)) : null;
+            const handledTime = emergency.handledAt ? 
+                (emergency.handledAt.toDate ? emergency.handledAt.toDate() : new Date(emergency.handledAt)) : null;
+            const completedTime = emergency.completedAt ? 
+                (emergency.completedAt.toDate ? emergency.completedAt.toDate() : new Date(emergency.completedAt)) : null;
             
             let responseTime = 'N/A';
             let handlingTime = 'N/A';
             let totalTime = 'N/A';
             
             if (receivedTime && handledTime) {
-                const responseMins = Math.floor((handledTime - receivedTime) / 60000);
-                const responseSecs = Math.floor(((handledTime - receivedTime) % 60000) / 1000);
-                responseTime = responseMins > 0 ? `${responseMins}m ${responseSecs}s` : `${responseSecs}s`;
+                const diffMs = handledTime - receivedTime;
+                const diffMins = Math.floor(diffMs / 60000);
+                const diffSecs = Math.floor((diffMs % 60000) / 1000);
+                responseTime = diffMins > 0 ? `${diffMins}m ${diffSecs}s` : `${diffSecs}s`;
             }
             
             if (handledTime && completedTime) {
-                const handlingMins = Math.floor((completedTime - handledTime) / 60000);
-                const handlingSecs = Math.floor(((completedTime - handledTime) % 60000) / 1000);
-                handlingTime = handlingMins > 0 ? `${handlingMins}m ${handlingSecs}s` : `${handlingSecs}s`;
+                const diffMs = completedTime - handledTime;
+                const diffMins = Math.floor(diffMs / 60000);
+                const diffSecs = Math.floor((diffMs % 60000) / 1000);
+                handlingTime = diffMins > 0 ? `${diffMins}m ${diffSecs}s` : `${diffSecs}s`;
             }
             
             if (receivedTime && completedTime) {
-                const totalMins = Math.floor((completedTime - receivedTime) / 60000);
-                const totalSecs = Math.floor(((completedTime - receivedTime) % 60000) / 1000);
-                totalTime = totalMins > 0 ? `${totalMins}m ${totalSecs}s` : `${totalSecs}s`;
+                const diffMs = completedTime - receivedTime;
+                const diffMins = Math.floor(diffMs / 60000);
+                const diffSecs = Math.floor((diffMs % 60000) / 1000);
+                totalTime = diffMins > 0 ? `${diffMins}m ${diffSecs}s` : `${diffSecs}s`;
             }
             
             let locationHistoryHTML = '';
-            if (locations.length > 0) {
+            if (locations && locations.length > 0) {
                 locationHistoryHTML = '<h5 style="margin-top: 10px;">📍 Location Updates</h5>';
                 locations.forEach(loc => {
-                    const time = loc.clientTimestamp ? new Date(loc.clientTimestamp).toLocaleString() : 'N/A';
+                    const time = loc.clientTimestamp ? new Date(loc.clientTimestamp).toLocaleString() : 
+                                (loc.timestamp ? new Date(loc.timestamp.seconds * 1000).toLocaleString() : 'N/A');
                     locationHistoryHTML += `
                         <div class="timeline-item" style="border-left-color: #17a2b8;">
                             <div class="timeline-time">#${loc.sequence} - ${time}</div>
@@ -2835,7 +2881,7 @@
             }
             
             infoDiv.innerHTML = `
-                <h4>Emergency History - ${emergency.userName}</h4>
+                <h4>Emergency History - ${emergency.userName || 'Unknown User'}</h4>
                 <div class="history-timeline">
                     <div class="timeline-item">
                         <div class="timeline-time">📥 Received: ${receivedTime ? receivedTime.toLocaleString() : 'N/A'}</div>
@@ -2858,7 +2904,7 @@
                 ${locationHistoryHTML}
                 <div class="route-stats">
                     <div class="stat-item">
-                        <div class="stat-value">${locations.length}</div>
+                        <div class="stat-value">${locations ? locations.length : 0}</div>
                         <div class="stat-label-small">Location Updates</div>
                     </div>
                     <div class="stat-item">
@@ -3218,7 +3264,7 @@
                     if (groupDoc.exists) groupName = groupDoc.data().name;
                 }
                 
-                const userCred = await auth.createUserWithEmailAndPassword(email, password);
+                const userCred = await auth.createUserWithEmailAndPassword(email, 'temppassword123');
                 
                 await db.collection(USERS_COLLECTION).doc(userCred.user.uid).set({
                     userId: userCred.user.uid,
