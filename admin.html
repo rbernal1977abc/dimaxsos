@@ -142,12 +142,15 @@
             box-shadow: 0 5px 15px rgba(0,0,0,0.2);
         }
 
+        /* MUCH MORE OBVIOUS EMBOSSED ACTIVE TAB */
         .nav-tab.active {
             background: #ff4d4d;
             color: white;
             font-weight: bold;
-            transform: scale(1.05);
-            box-shadow: 0 5px 20px rgba(255,77,77,0.4);
+            transform: scale(1.08);
+            box-shadow: 0 8px 25px rgba(255,77,77,0.6);
+            border: 2px solid white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
         }
 
         .tab-content {
@@ -219,12 +222,14 @@
             transition: all 0.3s ease;
         }
 
+        /* MUCH MORE OBVIOUS EMBOSSED ACTIVE FILTER BUTTON */
         .filter-btn.active {
             background: #ff4d4d;
             color: white;
             font-weight: bold;
-            transform: scale(1.05);
-            box-shadow: 0 5px 15px rgba(255,77,77,0.3);
+            transform: scale(1.08);
+            box-shadow: 0 5px 20px rgba(255,77,77,0.5);
+            border: 2px solid white;
         }
 
         .filter-btn.all { background: #6c757d; color: white; }
@@ -272,6 +277,7 @@
             padding: 20px;
             max-height: 600px;
             overflow-y: auto;
+            transition: background-color 0.2s ease;
         }
 
         .emergencies-list h3 {
@@ -294,6 +300,7 @@
             animation: slideIn 0.3s ease;
         }
 
+        /* REMOVED FLICKERING - stable highlighting only */
         .emergency-item.new-emergency {
             background: #fff3f3;
             border-left-width: 8px;
@@ -329,6 +336,8 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 10px;
+            flex-wrap: wrap;
+            gap: 5px;
         }
 
         .emergency-title {
@@ -370,6 +379,9 @@
             color: #17a2b8;
             font-weight: 600;
             margin-left: 5px;
+            background: #e3f2fd;
+            padding: 2px 6px;
+            border-radius: 3px;
         }
 
         .emergency-actions {
@@ -412,6 +424,10 @@
         .btn-view-history {
             background: #6c757d;
             color: white;
+        }
+
+        .btn-view-history:hover {
+            background: #5a6268;
         }
 
         .btn-delete {
@@ -1164,6 +1180,7 @@
             gap: 15px;
             justify-content: space-around;
             margin-top: 10px;
+            flex-wrap: wrap;
         }
 
         .stat-item {
@@ -1281,6 +1298,28 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        /* Loading indicator for history view */
+        .history-loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        
+        .history-loading .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #ff4d4d;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 10px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -1381,7 +1420,7 @@
             </div>
         </div>
 
-        <!-- Navigation Tabs - EMBOSSED active state -->
+        <!-- Navigation Tabs - MUCH MORE OBVIOUS EMBOSSED ACTIVE STATE -->
         <div class="nav-tabs">
             <div class="nav-tab active" onclick="switchTab('emergencies')">🚨 Live Emergencies</div>
             <div class="nav-tab" onclick="switchTab('users-groups')">👥 Users & Groups</div>
@@ -1392,7 +1431,7 @@
 
         <!-- Emergencies Tab -->
         <div id="emergenciesTab" class="tab-content active">
-            <!-- Filter Bar - EMBOSSED active state -->
+            <!-- Filter Bar - MUCH MORE OBVIOUS EMBOSSED ACTIVE STATE -->
             <div class="filter-bar">
                 <div class="filter-group">
                     <button class="filter-btn all" onclick="filterEmergencies('all')">All</button>
@@ -1802,6 +1841,7 @@
         let activeLocationListeners = new Map();
         let emergencyUnsubscribers = new Map();
         let processingChange = false;
+        let refreshTimeout = null;
 
         // Connection status
         let connectionStatus = document.getElementById('connectionStatus');
@@ -1847,7 +1887,7 @@
             }
         }
 
-        // ===== FIXED: Start force refresh with duplicate prevention =====
+        // ===== FIXED: Start force refresh with stable updates (no flickering) =====
         function startForceRefresh() {
             if (forceRefreshInterval) {
                 clearInterval(forceRefreshInterval);
@@ -1856,8 +1896,9 @@
             forceRefreshInterval = setInterval(async () => {
                 const now = Date.now();
                 
-                // Only refresh if no real-time updates in the last 2 seconds
-                if (now - lastUpdateTime > 2000) {
+                // Only refresh if no real-time updates in the last 3 seconds
+                // AND not currently processing a change
+                if (!processingChange && now - lastUpdateTime > 3000) {
                     try {
                         await refreshEmergenciesDisplay();
                         lastUpdateTime = Date.now();
@@ -1865,7 +1906,7 @@
                         console.log('Force refresh check error:', error);
                     }
                 }
-            }, 3000);
+            }, 5000); // Check every 5 seconds
         }
 
         // Stop force refresh
@@ -1876,7 +1917,7 @@
             }
         }
 
-        // ===== FIXED: Real-time listener with duplicate prevention =====
+        // ===== FIXED: Real-time listener with debounced updates (no flickering) =====
         function setupRealtimeEmergenciesListener() {
             const unsubscribe = db.collection(EMERGENCIES_COLLECTION)
                 .orderBy('timestamp', 'desc')
@@ -1896,9 +1937,9 @@
                             const emergency = change.doc.data();
                             emergency.id = change.doc.id;
                             
-                            // Check if recently processed (within last 2 seconds)
+                            // Check if recently processed (within last 3 seconds)
                             const recentlyProcessed = processedEmergencies.has(emergency.id) && 
-                                (Date.now() - processedEmergencies.get(emergency.id) < 2000);
+                                (Date.now() - processedEmergencies.get(emergency.id) < 3000);
                             
                             if (!recentlyProcessed) {
                                 validChanges.push(change);
@@ -1925,13 +1966,17 @@
                             }
                         });
                         
-                        // Refresh display
-                        refreshEmergenciesDisplay();
-                        loadStats();
+                        // Debounce the display refresh to prevent flickering
+                        if (refreshTimeout) {
+                            clearTimeout(refreshTimeout);
+                        }
                         
-                        setTimeout(() => {
+                        refreshTimeout = setTimeout(() => {
+                            refreshEmergenciesDisplay();
+                            loadStats();
                             processingChange = false;
-                        }, 1000);
+                            refreshTimeout = null;
+                        }, 500); // Wait 500ms before refreshing to batch updates
                     },
                     error: (error) => {
                         console.error('Real-time listener error:', error);
@@ -2295,10 +2340,15 @@
             const diffMs = end - start;
             const diffMins = Math.floor(diffMs / 60000);
             const diffSecs = Math.floor((diffMs % 60000) / 1000);
-            return `${diffMins}m ${diffSecs}s`;
+            
+            if (diffMins > 0) {
+                return `${diffMins}m ${diffSecs}s`;
+            } else {
+                return `${diffSecs}s`;
+            }
         }
 
-        // Refresh emergencies display
+        // Refresh emergencies display (stable, no flickering)
         async function refreshEmergenciesDisplay() {
             try {
                 const snapshot = await db.collection(EMERGENCIES_COLLECTION)
@@ -2306,7 +2356,6 @@
                     .get();
                 
                 const emergenciesList = document.getElementById('emergenciesList');
-                emergenciesList.innerHTML = '';
                 
                 // Clear markers but keep map
                 for (let id in mapMarkers) {
@@ -2316,6 +2365,9 @@
                 
                 let emergencyCount = 0;
                 let hasActiveEmergency = false;
+                
+                // Build new content
+                let newContent = '';
                 
                 for (const doc of snapshot.docs) {
                     const emergency = doc.data();
@@ -2341,7 +2393,9 @@
                     // Apply filter
                     if (currentFilter === 'all' || emergency.status === currentFilter) {
                         emergencyCount++;
-                        emergenciesList.appendChild(createEmergencyItem(emergency));
+                        // Create emergency item HTML
+                        const itemHtml = createEmergencyItemHTML(emergency);
+                        newContent += itemHtml;
                         
                         // Add marker to map for active/in-progress emergencies
                         if (emergency.currentLocation && (emergency.status === 'active' || emergency.status === 'in-progress')) {
@@ -2351,11 +2405,14 @@
                     }
                 }
                 
-                document.getElementById('emergencyCount').textContent = emergencyCount;
-                
+                // Update DOM in one operation (prevents flickering)
                 if (emergencyCount === 0) {
                     emergenciesList.innerHTML = '<p style="text-align: center; padding: 20px;">No emergencies found</p>';
+                } else {
+                    emergenciesList.innerHTML = newContent;
                 }
+                
+                document.getElementById('emergencyCount').textContent = emergencyCount;
                 
                 // If no active emergencies, reset map to default view
                 if (!hasActiveEmergency) {
@@ -2365,6 +2422,88 @@
             } catch (error) {
                 console.error('Refresh error:', error);
             }
+        }
+
+        // Create emergency item HTML (separate from DOM manipulation)
+        function createEmergencyItemHTML(emergency) {
+            const time = emergency.timestamp ? new Date(emergency.timestamp.seconds * 1000).toLocaleString() : 'Just now';
+            const location = emergency.currentLocation || emergency.location || null;
+            const locationText = location ? 
+                `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` + (emergency.locationUpdateCount ? ` (#${emergency.locationUpdateCount})` : '') : 
+                'No location';
+            
+            // Calculate handling duration for completed emergencies
+            let durationText = '';
+            if (emergency.status === 'completed' && emergency.handledAt && emergency.completedAt) {
+                const duration = calculateDuration(emergency.handledAt, emergency.completedAt);
+                durationText = `<span class="duration-badge">⏱️ ${duration}</span>`;
+            }
+            
+            let statusBadge = '';
+            let operatorInfo = '';
+            let handleButton = '';
+            let completeButton = '';
+            let viewHistoryButton = '';
+            let deleteButton = '';
+            
+            switch(emergency.status) {
+                case 'active':
+                    statusBadge = '<span class="emergency-badge badge-active">ACTIVE</span>';
+                    handleButton = `<button class="action-btn btn-handle" onclick="event.stopPropagation(); handleEmergency('${emergency.id}')">Handle</button>`;
+                    if (currentUserRole === 'admin') {
+                        deleteButton = `<button class="action-btn btn-delete" onclick="event.stopPropagation(); deleteEmergency('${emergency.id}')">Delete</button>`;
+                    }
+                    break;
+                    
+                case 'in-progress':
+                    statusBadge = '<span class="emergency-badge badge-in-progress">IN PROGRESS</span>';
+                    if (emergency.handledByName) {
+                        operatorInfo = `<span class="operator-badge">👤 ${emergency.handledByName}</span>`;
+                    }
+                    // Only the handler or admin can complete
+                    if (emergency.handledBy === currentUser?.uid || currentUserRole === 'admin') {
+                        completeButton = `<button class="action-btn btn-complete" onclick="event.stopPropagation(); showCompleteConfirm('${emergency.id}')">Complete</button>`;
+                    }
+                    if (currentUserRole === 'admin') {
+                        deleteButton = `<button class="action-btn btn-delete" onclick="event.stopPropagation(); deleteEmergency('${emergency.id}')">Delete</button>`;
+                    }
+                    break;
+                    
+                case 'completed':
+                    statusBadge = '<span class="emergency-badge badge-completed">COMPLETED</span>';
+                    if (emergency.handledByName) {
+                        operatorInfo = `<span class="operator-badge">👤 ${emergency.handledByName}</span>`;
+                    }
+                    // View History button for completed emergencies
+                    viewHistoryButton = `<button class="action-btn btn-view-history" onclick="event.stopPropagation(); viewEmergencyHistory('${emergency.id}')">View History</button>`;
+                    if (currentUserRole === 'admin') {
+                        deleteButton = `<button class="action-btn btn-delete" onclick="event.stopPropagation(); deleteEmergency('${emergency.id}')">Delete</button>`;
+                    }
+                    break;
+            }
+            
+            const activeClass = emergency.id === selectedEmergencyId ? 'active' : '';
+            
+            return `
+                <div class="emergency-item ${emergency.status} ${activeClass}" data-id="${emergency.id}" onclick="selectEmergency(${JSON.stringify(emergency).replace(/"/g, '&quot;')})">
+                    <div class="emergency-header">
+                        <span class="emergency-title">${emergency.userName}</span>
+                        ${statusBadge} ${operatorInfo} ${durationText}
+                    </div>
+                    <div class="emergency-details">
+                        <div>📞 ${emergency.contactNumber}</div>
+                        <div>📍 ${locationText}</div>
+                        <div>⏰ ${time}</div>
+                        <div>👥 ${emergency.groupName || 'No Group'}</div>
+                    </div>
+                    <div class="emergency-actions">
+                        ${handleButton}
+                        ${completeButton}
+                        ${viewHistoryButton}
+                        ${deleteButton}
+                    </div>
+                </div>
+            `;
         }
 
         // Add marker to map
@@ -2396,7 +2535,11 @@
                 </div>
             `);
             
-            marker.on('click', () => selectEmergency(emergency));
+            marker.on('click', () => {
+                // Create a copy of emergency for selection
+                const emergencyCopy = {...emergency};
+                selectEmergency(emergencyCopy);
+            });
             
             mapMarkers[emergencyId] = marker;
         }
@@ -2495,91 +2638,6 @@
             `;
         }
 
-        // ===== FIXED: Create emergency item with complete operator info and View History button =====
-        function createEmergencyItem(emergency) {
-            const div = document.createElement('div');
-            div.className = `emergency-item ${emergency.status} ${emergency.id === selectedEmergencyId ? 'active' : ''}`;
-            div.setAttribute('data-id', emergency.id);
-            div.onclick = () => selectEmergency(emergency);
-            
-            const time = emergency.timestamp ? new Date(emergency.timestamp.seconds * 1000).toLocaleString() : 'Just now';
-            const location = emergency.currentLocation || emergency.location || null;
-            const locationText = location ? 
-                `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` + (emergency.locationUpdateCount ? ` (#${emergency.locationUpdateCount})` : '') : 
-                'No location';
-            
-            // Calculate handling duration for completed emergencies
-            let durationText = '';
-            if (emergency.status === 'completed' && emergency.handledAt && emergency.completedAt) {
-                const duration = calculateDuration(emergency.handledAt, emergency.completedAt);
-                durationText = `<span class="duration-badge">⏱️ ${duration}</span>`;
-            }
-            
-            let statusBadge = '';
-            let operatorInfo = '';
-            let handleButton = '';
-            let completeButton = '';
-            let viewHistoryButton = '';
-            let deleteButton = '';
-            
-            switch(emergency.status) {
-                case 'active':
-                    statusBadge = '<span class="emergency-badge badge-active">ACTIVE</span>';
-                    handleButton = `<button class="action-btn btn-handle" onclick="event.stopPropagation(); handleEmergency('${emergency.id}')">Handle</button>`;
-                    if (currentUserRole === 'admin') {
-                        deleteButton = `<button class="action-btn btn-delete" onclick="event.stopPropagation(); deleteEmergency('${emergency.id}')">Delete</button>`;
-                    }
-                    break;
-                    
-                case 'in-progress':
-                    statusBadge = '<span class="emergency-badge badge-in-progress">IN PROGRESS</span>';
-                    if (emergency.handledByName) {
-                        operatorInfo = `<span class="operator-badge">👤 ${emergency.handledByName}</span>`;
-                    }
-                    // Only the handler or admin can complete
-                    if (emergency.handledBy === currentUser?.uid || currentUserRole === 'admin') {
-                        completeButton = `<button class="action-btn btn-complete" onclick="event.stopPropagation(); showCompleteConfirm('${emergency.id}')">Complete</button>`;
-                    }
-                    if (currentUserRole === 'admin') {
-                        deleteButton = `<button class="action-btn btn-delete" onclick="event.stopPropagation(); deleteEmergency('${emergency.id}')">Delete</button>`;
-                    }
-                    break;
-                    
-                case 'completed':
-                    statusBadge = '<span class="emergency-badge badge-completed">COMPLETED</span>';
-                    if (emergency.handledByName) {
-                        operatorInfo = `<span class="operator-badge">👤 ${emergency.handledByName}</span>`;
-                    }
-                    // View History button for completed emergencies
-                    viewHistoryButton = `<button class="action-btn btn-view-history" onclick="event.stopPropagation(); viewEmergencyHistory('${emergency.id}')">View History</button>`;
-                    if (currentUserRole === 'admin') {
-                        deleteButton = `<button class="action-btn btn-delete" onclick="event.stopPropagation(); deleteEmergency('${emergency.id}')">Delete</button>`;
-                    }
-                    break;
-            }
-            
-            div.innerHTML = `
-                <div class="emergency-header">
-                    <span class="emergency-title">${emergency.userName}</span>
-                    ${statusBadge} ${operatorInfo} ${durationText}
-                </div>
-                <div class="emergency-details">
-                    <div>📞 ${emergency.contactNumber}</div>
-                    <div>📍 ${locationText}</div>
-                    <div>⏰ ${time}</div>
-                    <div>👥 ${emergency.groupName || 'No Group'}</div>
-                </div>
-                <div class="emergency-actions">
-                    ${handleButton}
-                    ${completeButton}
-                    ${viewHistoryButton}
-                    ${deleteButton}
-                </div>
-            `;
-            
-            return div;
-        }
-
         // Select emergency
         window.selectEmergency = function(emergency) {
             selectedEmergencyId = emergency.id;
@@ -2614,6 +2672,15 @@
         // ===== FIXED: View emergency history with all location points =====
         window.viewEmergencyHistory = async function(emergencyId) {
             try {
+                // Show loading indicator
+                const infoDiv = document.getElementById('selectedEmergencyInfo');
+                infoDiv.innerHTML = `
+                    <div class="history-loading">
+                        <div class="spinner"></div>
+                        <p>Loading location history...</p>
+                    </div>
+                `;
+                
                 const doc = await db.collection(EMERGENCIES_COLLECTION).doc(emergencyId).get();
                 if (doc.exists) {
                     const emergency = doc.data();
@@ -2650,7 +2717,7 @@
                         locations.forEach((loc, index) => {
                             const customIcon = L.divIcon({
                                 className: 'custom-marker',
-                                html: `<div style="background-color: #28a745; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px; border: 2px solid white;">${loc.sequence}</div>`,
+                                html: `<div style="background-color: #28a745; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">${loc.sequence}</div>`,
                                 iconSize: [32, 32],
                                 iconAnchor: [16, 16]
                             });
@@ -2672,8 +2739,10 @@
                             waypoints.push(L.latLng(loc.location.lat, loc.location.lng));
                         });
                         
+                        // Center map on first location
                         map.setView([locations[0].location.lat, locations[0].location.lng], 14);
                         
+                        // Draw route if multiple points
                         if (locations.length > 1) {
                             routingControl = L.Routing.control({
                                 waypoints: waypoints,
@@ -2690,6 +2759,7 @@
                         
                         showHistoryInfo(emergency, locations);
                     } else if (emergency.location) {
+                        // Fallback to single location
                         const customIcon = L.divIcon({
                             className: 'custom-marker',
                             html: `<div style="background-color: #28a745; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px; border: 2px solid white;">1</div>`,
@@ -2706,11 +2776,14 @@
                         historyMarkers.push(marker);
                         map.setView([emergency.location.lat, emergency.location.lng], 14);
                         showHistoryInfo(emergency, []);
+                    } else {
+                        // No locations
+                        infoDiv.innerHTML = '<h4>No location history available</h4>';
                     }
                 }
             } catch (error) {
                 console.error('Error viewing history:', error);
-                alert('Error loading history: ' + error.message);
+                document.getElementById('selectedEmergencyInfo').innerHTML = '<h4>Error loading history</h4>';
             }
         };
 
@@ -2728,17 +2801,20 @@
             
             if (receivedTime && handledTime) {
                 const responseMins = Math.round((handledTime - receivedTime) / 60000);
-                responseTime = `${responseMins} min`;
+                const responseSecs = Math.round((handledTime - receivedTime) / 1000) % 60;
+                responseTime = responseMins > 0 ? `${responseMins}m ${responseSecs}s` : `${responseSecs}s`;
             }
             
             if (handledTime && completedTime) {
                 const handlingMins = Math.round((completedTime - handledTime) / 60000);
-                handlingTime = `${handlingMins} min`;
+                const handlingSecs = Math.round((completedTime - handledTime) / 1000) % 60;
+                handlingTime = handlingMins > 0 ? `${handlingMins}m ${handlingSecs}s` : `${handlingSecs}s`;
             }
             
             if (receivedTime && completedTime) {
                 const totalMins = Math.round((completedTime - receivedTime) / 60000);
-                totalTime = `${totalMins} min`;
+                const totalSecs = Math.round((completedTime - receivedTime) / 1000) % 60;
+                totalTime = totalMins > 0 ? `${totalMins}m ${totalSecs}s` : `${totalSecs}s`;
             }
             
             let locationHistoryHTML = '';
@@ -3483,7 +3559,7 @@
             const groupId = document.getElementById('reportGroupFilter').value;
             const snapshot = await db.collection(EMERGENCIES_COLLECTION).orderBy('timestamp', 'desc').get();
             
-            let html = '<table><tr><th>Date</th><th>User</th><th>Status</th><th>Handled By</th><th>Duration</th></tr>';
+            let html = '<table border="1" style="width:100%; border-collapse:collapse;"><tr><th>Date</th><th>User</th><th>Status</th><th>Handled By</th><th>Duration</th></tr>';
             snapshot.forEach(doc => {
                 const d = doc.data();
                 const duration = (d.handledAt && d.completedAt) ? calculateDuration(d.handledAt, d.completedAt) : 'N/A';
@@ -3509,9 +3585,6 @@
                 
                 const activeSnapshot = await db.collection(EMERGENCIES_COLLECTION).where('status', '==', 'active').get();
                 document.getElementById('activeEmergencies').textContent = activeSnapshot.size;
-                
-                const inProgressSnapshot = await db.collection(EMERGENCIES_COLLECTION).where('status', '==', 'in-progress').get();
-                document.getElementById('inProgressEmergencies').textContent = inProgressSnapshot.size;
                 
                 const completedSnapshot = await db.collection(EMERGENCIES_COLLECTION).where('status', '==', 'completed').get();
                 document.getElementById('completedEmergencies').textContent = completedSnapshot.size;
