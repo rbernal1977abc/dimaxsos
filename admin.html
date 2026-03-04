@@ -298,12 +298,14 @@
             transition: all 0.3s ease;
             position: relative;
             animation: slideIn 0.3s ease;
+            /* REMOVED ANY PULSING OR FLICKERING ANIMATIONS */
         }
 
-        /* REMOVED FLICKERING - stable highlighting only */
+        /* NO FLICKERING - just stable static highlighting */
         .emergency-item.new-emergency {
             background: #fff3f3;
             border-left-width: 8px;
+            /* NO ANIMATION */
         }
 
         .emergency-item:hover {
@@ -1821,6 +1823,9 @@
         let soundEnabled = true;
         let currentFilter = 'active';
         let selectedGroupId = null;
+        let lastEmergencyData = null; // Store last emergency data to prevent flickering
+        let refreshTimeout = null;
+        let isRefreshing = false;
         
         // Audio for alerts
         const alertSound = new Audio();
@@ -1841,7 +1846,6 @@
         let activeLocationListeners = new Map();
         let emergencyUnsubscribers = new Map();
         let processingChange = false;
-        let refreshTimeout = null;
 
         // Connection status
         let connectionStatus = document.getElementById('connectionStatus');
@@ -1887,26 +1891,38 @@
             }
         }
 
-        // ===== FIXED: Start force refresh with stable updates (no flickering) =====
+        // ===== FIXED: Start force refresh with stable updates (NO FLICKERING) =====
         function startForceRefresh() {
             if (forceRefreshInterval) {
                 clearInterval(forceRefreshInterval);
             }
             
+            // Check for updates in background without visual flickering
             forceRefreshInterval = setInterval(async () => {
                 const now = Date.now();
                 
-                // Only refresh if no real-time updates in the last 3 seconds
-                // AND not currently processing a change
-                if (!processingChange && now - lastUpdateTime > 3000) {
+                // Only check if no recent updates and not currently refreshing
+                if (!isRefreshing && now - lastUpdateTime > 5000) {
                     try {
-                        await refreshEmergenciesDisplay();
-                        lastUpdateTime = Date.now();
+                        // Check if there are any changes without refreshing UI
+                        const snapshot = await db.collection(EMERGENCIES_COLLECTION)
+                            .where('status', 'in', ['active', 'in-progress'])
+                            .get();
+                        
+                        const currentCount = snapshot.size;
+                        
+                        // Only refresh UI if count changed
+                        if (currentCount !== lastEmergencyCount) {
+                            console.log('Emergency count changed, refreshing UI');
+                            lastEmergencyCount = currentCount;
+                            // Use debounced refresh
+                            debouncedRefresh();
+                        }
                     } catch (error) {
-                        console.log('Force refresh check error:', error);
+                        console.log('Background check error:', error);
                     }
                 }
-            }, 5000); // Check every 5 seconds
+            }, 10000); // Check every 10 seconds (less frequent, no flickering)
         }
 
         // Stop force refresh
@@ -1917,7 +1933,18 @@
             }
         }
 
-        // ===== FIXED: Real-time listener with debounced updates (no flickering) =====
+        // ===== DEBOUNCED REFRESH - Prevents flickering =====
+        function debouncedRefresh() {
+            if (refreshTimeout) {
+                clearTimeout(refreshTimeout);
+            }
+            refreshTimeout = setTimeout(() => {
+                refreshEmergenciesDisplay();
+                refreshTimeout = null;
+            }, 1000); // Wait 1 second before refreshing
+        }
+
+        // ===== FIXED: Real-time listener with debounced updates (NO FLICKERING) =====
         function setupRealtimeEmergenciesListener() {
             const unsubscribe = db.collection(EMERGENCIES_COLLECTION)
                 .orderBy('timestamp', 'desc')
@@ -1931,52 +1958,28 @@
                         connectionStatus.className = 'connection-status connected';
                         lastUpdateTime = Date.now();
                         
-                        // Process changes without duplicate creation
-                        const validChanges = [];
+                        // Process changes in background without refreshing UI immediately
                         snapshot.docChanges().forEach(change => {
                             const emergency = change.doc.data();
                             emergency.id = change.doc.id;
                             
-                            // Check if recently processed (within last 3 seconds)
-                            const recentlyProcessed = processedEmergencies.has(emergency.id) && 
-                                (Date.now() - processedEmergencies.get(emergency.id) < 3000);
-                            
-                            if (!recentlyProcessed) {
-                                validChanges.push(change);
-                                if (change.type === 'added' || change.type === 'modified') {
-                                    processedEmergencies.set(emergency.id, Date.now());
+                            // Mark as processed
+                            if (change.type === 'added' || change.type === 'modified') {
+                                processedEmergencies.set(emergency.id, Date.now());
+                                
+                                if (change.type === 'added' && emergency.status === 'active') {
+                                    playAlertSound();
                                 }
                             }
                         });
                         
-                        // Process valid changes
-                        validChanges.forEach(change => {
-                            const emergency = change.doc.data();
-                            emergency.id = change.doc.id;
-                            
-                            if (change.type === 'added') {
-                                console.log('New emergency added:', emergency.id);
-                                handleNewEmergency(emergency);
-                            } else if (change.type === 'modified') {
-                                console.log('Emergency modified:', emergency.id);
-                                handleEmergencyUpdate(emergency);
-                            } else if (change.type === 'removed') {
-                                console.log('Emergency removed:', emergency.id);
-                                handleEmergencyRemoval(emergency.id);
-                            }
-                        });
+                        // Use debounced refresh to update UI smoothly
+                        debouncedRefresh();
+                        loadStats();
                         
-                        // Debounce the display refresh to prevent flickering
-                        if (refreshTimeout) {
-                            clearTimeout(refreshTimeout);
-                        }
-                        
-                        refreshTimeout = setTimeout(() => {
-                            refreshEmergenciesDisplay();
-                            loadStats();
+                        setTimeout(() => {
                             processingChange = false;
-                            refreshTimeout = null;
-                        }, 500); // Wait 500ms before refreshing to batch updates
+                        }, 2000);
                     },
                     error: (error) => {
                         console.error('Real-time listener error:', error);
@@ -2287,11 +2290,6 @@
                 console.log('No location history for new emergency:', emergency.id);
             }
             
-            // Play sound for active emergencies
-            if (emergency.status === 'active') {
-                playAlertSound();
-            }
-            
             // Set up location listener if active
             if (emergency.status === 'active' || emergency.status === 'in-progress') {
                 setupLocationListener(emergency.id);
@@ -2348,14 +2346,20 @@
             }
         }
 
-        // Refresh emergencies display (stable, no flickering)
+        // ===== FIXED: Refresh emergencies display (NO FLICKERING) =====
         async function refreshEmergenciesDisplay() {
+            if (isRefreshing) return;
+            isRefreshing = true;
+            
             try {
                 const snapshot = await db.collection(EMERGENCIES_COLLECTION)
                     .orderBy('timestamp', 'desc')
                     .get();
                 
                 const emergenciesList = document.getElementById('emergenciesList');
+                
+                // Store current scroll position
+                const scrollPos = emergenciesList.scrollTop;
                 
                 // Clear markers but keep map
                 for (let id in mapMarkers) {
@@ -2366,7 +2370,7 @@
                 let emergencyCount = 0;
                 let hasActiveEmergency = false;
                 
-                // Build new content
+                // Build new content in memory first (prevents flickering)
                 let newContent = '';
                 
                 for (const doc of snapshot.docs) {
@@ -2412,6 +2416,9 @@
                     emergenciesList.innerHTML = newContent;
                 }
                 
+                // Restore scroll position
+                emergenciesList.scrollTop = scrollPos;
+                
                 document.getElementById('emergencyCount').textContent = emergencyCount;
                 
                 // If no active emergencies, reset map to default view
@@ -2419,8 +2426,13 @@
                     clearAllMarkersAndResetMap();
                 }
                 
+                // Update last emergency count
+                lastEmergencyCount = emergencyCount;
+                
             } catch (error) {
                 console.error('Refresh error:', error);
+            } finally {
+                isRefreshing = false;
             }
         }
 
@@ -2443,7 +2455,6 @@
             let operatorInfo = '';
             let handleButton = '';
             let completeButton = '';
-            let viewHistoryButton = '';
             let deleteButton = '';
             
             switch(emergency.status) {
@@ -2474,8 +2485,6 @@
                     if (emergency.handledByName) {
                         operatorInfo = `<span class="operator-badge">👤 ${emergency.handledByName}</span>`;
                     }
-                    // View History button for completed emergencies
-                    viewHistoryButton = `<button class="action-btn btn-view-history" onclick="event.stopPropagation(); viewEmergencyHistory('${emergency.id}')">View History</button>`;
                     if (currentUserRole === 'admin') {
                         deleteButton = `<button class="action-btn btn-delete" onclick="event.stopPropagation(); deleteEmergency('${emergency.id}')">Delete</button>`;
                     }
@@ -2499,7 +2508,6 @@
                     <div class="emergency-actions">
                         ${handleButton}
                         ${completeButton}
-                        ${viewHistoryButton}
                         ${deleteButton}
                     </div>
                 </div>
@@ -2536,12 +2544,121 @@
             `);
             
             marker.on('click', () => {
-                // Create a copy of emergency for selection
-                const emergencyCopy = {...emergency};
-                selectEmergency(emergencyCopy);
+                // When clicking on marker, show location history if completed
+                if (emergency.status === 'completed') {
+                    showEmergencyHistoryOnMap(emergency.id);
+                } else {
+                    selectEmergency(emergency);
+                }
             });
             
             mapMarkers[emergencyId] = marker;
+        }
+
+        // ===== NEW: Show emergency history on map when clicking completed marker =====
+        async function showEmergencyHistoryOnMap(emergencyId) {
+            try {
+                const doc = await db.collection(EMERGENCIES_COLLECTION).doc(emergencyId).get();
+                if (!doc.exists) return;
+                
+                const emergency = doc.data();
+                emergency.id = doc.id;
+                
+                // Clear existing markers and route
+                for (let id in mapMarkers) {
+                    if (mapMarkers[id]) map.removeLayer(mapMarkers[id]);
+                }
+                mapMarkers = {};
+                
+                historyMarkers.forEach(marker => {
+                    if (marker) map.removeLayer(marker);
+                });
+                historyMarkers = [];
+                
+                if (routingControl) {
+                    map.removeControl(routingControl);
+                    routingControl = null;
+                }
+                
+                // Get all location history
+                const historySnapshot = await db.collection(LOCATION_HISTORY_COLLECTION)
+                    .where('emergencyId', '==', emergencyId)
+                    .orderBy('sequence')
+                    .get();
+                
+                const locations = [];
+                historySnapshot.forEach(doc => locations.push(doc.data()));
+                
+                if (locations.length > 0) {
+                    const waypoints = [];
+                    
+                    locations.forEach((loc, index) => {
+                        const customIcon = L.divIcon({
+                            className: 'custom-marker',
+                            html: `<div style="background-color: #28a745; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">${loc.sequence}</div>`,
+                            iconSize: [32, 32],
+                            iconAnchor: [16, 16]
+                        });
+                        
+                        const marker = L.marker([loc.location.lat, loc.location.lng], { icon: customIcon }).addTo(map);
+                        
+                        const time = loc.clientTimestamp ? new Date(loc.clientTimestamp).toLocaleString() : 'N/A';
+                        
+                        marker.bindPopup(`
+                            <div style="min-width: 200px;">
+                                <b>${emergency.userName}</b><br>
+                                <span style="color: #28a745; font-weight: bold;">📍 Update #${loc.sequence}</span><br>
+                                <span>⏰ ${time}</span><br>
+                                <span>🎯 Accuracy: ${loc.location.accuracy ? Math.round(loc.location.accuracy) + 'm' : 'N/A'}</span>
+                            </div>
+                        `);
+                        
+                        historyMarkers.push(marker);
+                        waypoints.push(L.latLng(loc.location.lat, loc.location.lng));
+                    });
+                    
+                    // Center map on first location
+                    map.setView([locations[0].location.lat, locations[0].location.lng], 14);
+                    
+                    // Draw route if multiple points
+                    if (locations.length > 1) {
+                        routingControl = L.Routing.control({
+                            waypoints: waypoints,
+                            routeWhileDragging: false,
+                            addWaypoints: false,
+                            draggableWaypoints: false,
+                            fitSelectedRoutes: true,
+                            showAlternatives: false,
+                            lineOptions: {
+                                styles: [{ color: '#28a745', opacity: 0.7, weight: 4 }]
+                            }
+                        }).addTo(map);
+                    }
+                    
+                    // Show history info
+                    showHistoryInfo(emergency, locations);
+                } else if (emergency.location) {
+                    // Fallback to single location
+                    const customIcon = L.divIcon({
+                        className: 'custom-marker',
+                        html: `<div style="background-color: #28a745; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px; border: 2px solid white;">1</div>`,
+                        iconSize: [32, 32],
+                        iconAnchor: [16, 16]
+                    });
+                    
+                    const marker = L.marker([emergency.location.lat, emergency.location.lng], { icon: customIcon }).addTo(map);
+                    marker.bindPopup(`
+                        <b>${emergency.userName}</b><br>
+                        <span style="color: #28a745; font-weight: bold;">COMPLETED</span>
+                    `);
+                    
+                    historyMarkers.push(marker);
+                    map.setView([emergency.location.lat, emergency.location.lng], 14);
+                    showHistoryInfo(emergency, []);
+                }
+            } catch (error) {
+                console.error('Error showing history:', error);
+            }
         }
 
         // Setup location listener
@@ -2565,7 +2682,7 @@
                                     emergency.locationUpdateCount = location.sequence;
                                     
                                     addMarkerToMap(emergencyId, emergency);
-                                    refreshEmergenciesDisplay();
+                                    debouncedRefresh();
                                     
                                     if (selectedEmergencyId === emergencyId) {
                                         showEmergencyInfo(emergency);
@@ -2635,6 +2752,7 @@
                     ${locationHtml}
                 </div>
                 ${handlingInfo}
+                ${emergency.status === 'completed' ? '<p><em>Click on the green markers to see location history with sequence numbers</em></p>' : ''}
             `;
         }
 
@@ -2667,124 +2785,6 @@
             const emergencyId = document.getElementById('completeEmergencyId').value;
             closeModal('completeConfirmModal');
             await completeEmergency(emergencyId);
-        };
-
-        // ===== FIXED: View emergency history with all location points =====
-        window.viewEmergencyHistory = async function(emergencyId) {
-            try {
-                // Show loading indicator
-                const infoDiv = document.getElementById('selectedEmergencyInfo');
-                infoDiv.innerHTML = `
-                    <div class="history-loading">
-                        <div class="spinner"></div>
-                        <p>Loading location history...</p>
-                    </div>
-                `;
-                
-                const doc = await db.collection(EMERGENCIES_COLLECTION).doc(emergencyId).get();
-                if (doc.exists) {
-                    const emergency = doc.data();
-                    emergency.id = doc.id;
-                    
-                    // Clear existing markers and route
-                    for (let id in mapMarkers) {
-                        if (mapMarkers[id]) map.removeLayer(mapMarkers[id]);
-                    }
-                    mapMarkers = {};
-                    
-                    historyMarkers.forEach(marker => {
-                        if (marker) map.removeLayer(marker);
-                    });
-                    historyMarkers = [];
-                    
-                    if (routingControl) {
-                        map.removeControl(routingControl);
-                        routingControl = null;
-                    }
-                    
-                    // Get all location history
-                    const historySnapshot = await db.collection(LOCATION_HISTORY_COLLECTION)
-                        .where('emergencyId', '==', emergencyId)
-                        .orderBy('sequence')
-                        .get();
-                    
-                    const locations = [];
-                    historySnapshot.forEach(doc => locations.push(doc.data()));
-                    
-                    if (locations.length > 0) {
-                        const waypoints = [];
-                        
-                        locations.forEach((loc, index) => {
-                            const customIcon = L.divIcon({
-                                className: 'custom-marker',
-                                html: `<div style="background-color: #28a745; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">${loc.sequence}</div>`,
-                                iconSize: [32, 32],
-                                iconAnchor: [16, 16]
-                            });
-                            
-                            const marker = L.marker([loc.location.lat, loc.location.lng], { icon: customIcon }).addTo(map);
-                            
-                            const time = loc.clientTimestamp ? new Date(loc.clientTimestamp).toLocaleString() : 'N/A';
-                            
-                            marker.bindPopup(`
-                                <div style="min-width: 200px;">
-                                    <b>${emergency.userName}</b><br>
-                                    <span style="color: #28a745; font-weight: bold;">📍 Update #${loc.sequence}</span><br>
-                                    <span>⏰ ${time}</span><br>
-                                    <span>🎯 Accuracy: ${loc.location.accuracy ? Math.round(loc.location.accuracy) + 'm' : 'N/A'}</span>
-                                </div>
-                            `);
-                            
-                            historyMarkers.push(marker);
-                            waypoints.push(L.latLng(loc.location.lat, loc.location.lng));
-                        });
-                        
-                        // Center map on first location
-                        map.setView([locations[0].location.lat, locations[0].location.lng], 14);
-                        
-                        // Draw route if multiple points
-                        if (locations.length > 1) {
-                            routingControl = L.Routing.control({
-                                waypoints: waypoints,
-                                routeWhileDragging: false,
-                                addWaypoints: false,
-                                draggableWaypoints: false,
-                                fitSelectedRoutes: true,
-                                showAlternatives: false,
-                                lineOptions: {
-                                    styles: [{ color: '#28a745', opacity: 0.7, weight: 4 }]
-                                }
-                            }).addTo(map);
-                        }
-                        
-                        showHistoryInfo(emergency, locations);
-                    } else if (emergency.location) {
-                        // Fallback to single location
-                        const customIcon = L.divIcon({
-                            className: 'custom-marker',
-                            html: `<div style="background-color: #28a745; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px; border: 2px solid white;">1</div>`,
-                            iconSize: [32, 32],
-                            iconAnchor: [16, 16]
-                        });
-                        
-                        const marker = L.marker([emergency.location.lat, emergency.location.lng], { icon: customIcon }).addTo(map);
-                        marker.bindPopup(`
-                            <b>${emergency.userName}</b><br>
-                            <span style="color: #28a745; font-weight: bold;">COMPLETED</span>
-                        `);
-                        
-                        historyMarkers.push(marker);
-                        map.setView([emergency.location.lat, emergency.location.lng], 14);
-                        showHistoryInfo(emergency, []);
-                    } else {
-                        // No locations
-                        infoDiv.innerHTML = '<h4>No location history available</h4>';
-                    }
-                }
-            } catch (error) {
-                console.error('Error viewing history:', error);
-                document.getElementById('selectedEmergencyInfo').innerHTML = '<h4>Error loading history</h4>';
-            }
         };
 
         // Show history info
@@ -2891,8 +2891,8 @@
                     handledAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 
-                // Immediately refresh to show in In Progress tab
-                refreshEmergenciesDisplay();
+                // Debounced refresh
+                debouncedRefresh();
                 
             } catch (error) {
                 alert('Error handling emergency: ' + error.message);
@@ -2924,7 +2924,8 @@
                     delete mapMarkers[emergencyId];
                 }
                 
-                refreshEmergenciesDisplay();
+                // Debounced refresh
+                debouncedRefresh();
                 
             } catch (error) {
                 alert('Error completing emergency: ' + error.message);
@@ -2966,7 +2967,7 @@
                     delete mapMarkers[emergencyId];
                 }
                 
-                refreshEmergenciesDisplay();
+                debouncedRefresh();
                 
             } catch (error) {
                 alert('Error: ' + error.message);
