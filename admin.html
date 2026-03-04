@@ -2544,20 +2544,49 @@
             `);
             
             marker.on('click', () => {
-                // When clicking on marker, show location history if completed
-                if (emergency.status === 'completed') {
-                    showEmergencyHistoryOnMap(emergency.id);
-                } else {
-                    selectEmergency(emergency);
-                }
+                // When clicking on marker, select the emergency
+                selectEmergency(emergency);
             });
             
             mapMarkers[emergencyId] = marker;
         }
 
-        // ===== NEW: Show emergency history on map when clicking completed marker =====
+        // ===== FIXED: Select emergency - Show history for completed, location for active =====
+        window.selectEmergency = function(emergency) {
+            selectedEmergencyId = emergency.id;
+            
+            document.querySelectorAll('.emergency-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            const selectedItem = document.querySelector(`.emergency-item[data-id="${emergency.id}"]`);
+            if (selectedItem) selectedItem.classList.add('active');
+            
+            // If completed, show history on map
+            if (emergency.status === 'completed') {
+                showEmergencyHistoryOnMap(emergency.id);
+            } else {
+                // For active/in-progress, show current location
+                showEmergencyInfo(emergency);
+                
+                const location = emergency.currentLocation || emergency.location;
+                if (location && map) {
+                    map.setView([location.lat, location.lng], 15);
+                }
+            }
+        };
+
+        // ===== FIXED: Show emergency history on map (for completed emergencies) =====
         async function showEmergencyHistoryOnMap(emergencyId) {
             try {
+                // Show loading indicator
+                const infoDiv = document.getElementById('selectedEmergencyInfo');
+                infoDiv.innerHTML = `
+                    <div class="history-loading">
+                        <div class="spinner"></div>
+                        <p>Loading location history...</p>
+                    </div>
+                `;
+                
                 const doc = await db.collection(EMERGENCIES_COLLECTION).doc(emergencyId).get();
                 if (!doc.exists) return;
                 
@@ -2593,6 +2622,7 @@
                     const waypoints = [];
                     
                     locations.forEach((loc, index) => {
+                        // Create green markers with sequence numbers
                         const customIcon = L.divIcon({
                             className: 'custom-marker',
                             html: `<div style="background-color: #28a745; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">${loc.sequence}</div>`,
@@ -2655,9 +2685,13 @@
                     historyMarkers.push(marker);
                     map.setView([emergency.location.lat, emergency.location.lng], 14);
                     showHistoryInfo(emergency, []);
+                } else {
+                    // No locations
+                    infoDiv.innerHTML = '<h4>No location history available</h4>';
                 }
             } catch (error) {
                 console.error('Error showing history:', error);
+                document.getElementById('selectedEmergencyInfo').innerHTML = '<h4>Error loading history</h4>';
             }
         }
 
@@ -2705,7 +2739,7 @@
             }
         }
 
-        // Show emergency info
+        // Show emergency info (for active/in-progress)
         function showEmergencyInfo(emergency) {
             const infoDiv = document.getElementById('selectedEmergencyInfo');
             const time = emergency.timestamp ? new Date(emergency.timestamp.seconds * 1000).toLocaleString() : 'Just now';
@@ -2752,42 +2786,10 @@
                     ${locationHtml}
                 </div>
                 ${handlingInfo}
-                ${emergency.status === 'completed' ? '<p><em>Click on the green markers to see location history with sequence numbers</em></p>' : ''}
             `;
         }
 
-        // Select emergency
-        window.selectEmergency = function(emergency) {
-            selectedEmergencyId = emergency.id;
-            
-            document.querySelectorAll('.emergency-item').forEach(item => {
-                item.classList.remove('active');
-            });
-            const selectedItem = document.querySelector(`.emergency-item[data-id="${emergency.id}"]`);
-            if (selectedItem) selectedItem.classList.add('active');
-            
-            showEmergencyInfo(emergency);
-            
-            const location = emergency.currentLocation || emergency.location;
-            if (location && map) {
-                map.setView([location.lat, location.lng], 15);
-            }
-        };
-
-        // Show complete confirmation modal
-        window.showCompleteConfirm = function(emergencyId) {
-            document.getElementById('completeEmergencyId').value = emergencyId;
-            document.getElementById('completeConfirmModal').style.display = 'flex';
-        };
-
-        // Confirm complete
-        window.confirmComplete = async function() {
-            const emergencyId = document.getElementById('completeEmergencyId').value;
-            closeModal('completeConfirmModal');
-            await completeEmergency(emergencyId);
-        };
-
-        // Show history info
+        // Show history info (for completed emergencies)
         function showHistoryInfo(emergency, locations) {
             const infoDiv = document.getElementById('selectedEmergencyInfo');
             
@@ -2800,20 +2802,20 @@
             let totalTime = 'N/A';
             
             if (receivedTime && handledTime) {
-                const responseMins = Math.round((handledTime - receivedTime) / 60000);
-                const responseSecs = Math.round((handledTime - receivedTime) / 1000) % 60;
+                const responseMins = Math.floor((handledTime - receivedTime) / 60000);
+                const responseSecs = Math.floor(((handledTime - receivedTime) % 60000) / 1000);
                 responseTime = responseMins > 0 ? `${responseMins}m ${responseSecs}s` : `${responseSecs}s`;
             }
             
             if (handledTime && completedTime) {
-                const handlingMins = Math.round((completedTime - handledTime) / 60000);
-                const handlingSecs = Math.round((completedTime - handledTime) / 1000) % 60;
+                const handlingMins = Math.floor((completedTime - handledTime) / 60000);
+                const handlingSecs = Math.floor(((completedTime - handledTime) % 60000) / 1000);
                 handlingTime = handlingMins > 0 ? `${handlingMins}m ${handlingSecs}s` : `${handlingSecs}s`;
             }
             
             if (receivedTime && completedTime) {
-                const totalMins = Math.round((completedTime - receivedTime) / 60000);
-                const totalSecs = Math.round((completedTime - receivedTime) / 1000) % 60;
+                const totalMins = Math.floor((completedTime - receivedTime) / 60000);
+                const totalSecs = Math.floor(((completedTime - receivedTime) % 60000) / 1000);
                 totalTime = totalMins > 0 ? `${totalMins}m ${totalSecs}s` : `${totalSecs}s`;
             }
             
@@ -2874,6 +2876,19 @@
                 </div>
             `;
         }
+
+        // Show complete confirmation modal
+        window.showCompleteConfirm = function(emergencyId) {
+            document.getElementById('completeEmergencyId').value = emergencyId;
+            document.getElementById('completeConfirmModal').style.display = 'flex';
+        };
+
+        // Confirm complete
+        window.confirmComplete = async function() {
+            const emergencyId = document.getElementById('completeEmergencyId').value;
+            closeModal('completeConfirmModal');
+            await completeEmergency(emergencyId);
+        };
 
         // ===== FIXED: Handle emergency with proper visibility =====
         window.handleEmergency = async function(emergencyId) {
